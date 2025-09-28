@@ -76,7 +76,9 @@
                     
                     texture.mapping = THREE.EquirectangularReflectionMapping;
 
-                    scene.environment = texture;
+                    // The environment map provides subtle reflections/shading on the metal/porcelain, 
+                    // but the light from the lens does the heavy lifting for the glow.
+                    scene.environment = texture; 
 
                     console.log("HDR Environment Map 'env.hdr' loaded successfully.");
 
@@ -111,36 +113,29 @@
                 
                 loadedModel.traverse((child) => {
                     if (child.isMesh) {
-                        const material = child.material;
                         
-                        material.transparent = false;
-                        material.opacity = 1.0;
-                        material.emissive.set(0x000000);
-                        material.emissiveIntensity = 0.0;
-                        material.needsUpdate = true;
+                        let material = child.material;
                         
-                        // --- MATERIAL CUSTOMIZATION (FINAL TRANSLUCENCY TWEAKS) ---
+                        // --- MATERIAL CUSTOMIZATION (FINAL TRANSLUCENCY FIX) ---
                         let metalness = 0.0;
                         let roughness = 0.5;
                         let color = 0xffffff;
 
-                        if (modelName === 'sink') {
-                            // ALUMINA HEATSINK: Pure White, low sheen
+                        if (modelName === 'shade') {
+                            // *** FIX: Use MeshLambertMaterial for better light transmission ***
+                            material = new THREE.MeshLambertMaterial({
+                                color: 0xffffff,
+                                transparent: true,
+                                opacity: 0.6,
+                                side: THREE.DoubleSide,
+                            });
+                        } else if (modelName === 'sink') {
+                            // ALUMINA HEATSINK: PBR Standard Material is still fine here
                             metalness = 0.01; roughness = 0.4; color = 0xffffff; 
-                        } else if (modelName === 'shade') {
-                            // REFINED: DIFFUSE TRANSLUCENT PORCELAIN SHADE
-                            metalness = 0.01; 
-                            roughness = 0.95; 
-                            color = 0xffffff; 
-                            material.transparent = true; 
-                            // *** LOWER OPACITY: Reduced to allow more light through ***
-                            material.opacity = 0.6; 
-                            material.side = THREE.DoubleSide; // Render both sides of the shade for better lighting
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            // *** BOOSTED INTENSITY: Max power for the internal light source ***
                             material.emissiveIntensity = 10.0; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
@@ -157,9 +152,15 @@
                             material.transparent = true; material.opacity = 0.9; 
                         }
 
-                        material.metalness = metalness;
-                        material.roughness = roughness;
-                        material.color.set(color); 
+                        // Apply properties for Standard materials (non-shade components)
+                        if (material.isMeshStandardMaterial) {
+                            material.metalness = metalness;
+                            material.roughness = roughness;
+                            material.color.set(color); 
+                        }
+                        
+                        child.material = material;
+                        child.material.needsUpdate = true;
                         // --- END MATERIAL CUSTOMIZATION ---
                     }
                 });
@@ -175,7 +176,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Assembly and Materials complete. Ready for final review.");
+                    console.log("Translucency Fix Applied. Final Render Ready.");
                 }
             };
             
