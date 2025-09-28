@@ -202,7 +202,8 @@
                         child.layers.set(ENTIRE_SCENE); 
                         
                         // Slightly off-white to ensure a subtle shadow against pure white background
-                        const CERAMIC_COLOR = 0xf2f2f2; 
+                        // *** ADJUSTED CERAMIC COLOR FOR CONTRAST ***
+                        const CERAMIC_COLOR = 0xd8d8d8; 
 
                         if (modelName === 'shade') {
                             // TRANSLUCENT SHADE: Diffuses the light beautifully
@@ -216,8 +217,9 @@
                             material.color.set(0xfff8f0); 
                             
                             // SHADE GLOW: Must rely on its own emissive property now
-                            material.emissive.set(0xfff8f0); 
-                            material.emissiveIntensity = 5.0; // Increased to create a visible glow
+                            // *** ADJUSTED EMISSION INTENSITY FOR VISIBILITY ***
+                            material.emissive.set(0xffffff); 
+                            material.emissiveIntensity = 10.0; // Increased significantly
                             child.layers.enable(BLOOM_SCENE); 
                             
                         } else if (modelName === 'lens') {
