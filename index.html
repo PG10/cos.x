@@ -23,7 +23,6 @@
     
     <!-- 
         POST-PROCESSING PASSES (UMD versions from CDN) 
-        NOTE: These must load BEFORE the main script attempts to use their constructors (RenderPass, EffectComposer, etc.).
     -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
@@ -35,31 +34,46 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
     
     <script>
+        // --- CRITICAL FIX: EXPLICITLY ASSIGN GLOBAL CLASSES ---
+        // We ensure that the globally loaded UMD scripts are available under their direct names.
+        // This is necessary because the UMD scripts might not be available immediately when 'init' runs, 
+        // or they might not attach themselves consistently.
+        const RenderPass = window.RenderPass || (window.THREE && window.THREE.RenderPass);
+        const UnrealBloomPass = window.UnrealBloomPass || (window.THREE && window.THREE.UnrealBloomPass);
+        const EffectComposer = window.EffectComposer || (window.THREE && window.THREE.EffectComposer);
+        const ShaderPass = window.ShaderPass || (window.THREE && window.THREE.ShaderPass);
+
+        // Check if any critical dependency is missing (for better error feedback)
+        if (!RenderPass || !EffectComposer || !ShaderPass) {
+            console.error("FATAL ERROR: Three.js post-processing dependencies (RenderPass, EffectComposer, ShaderPass) failed to load from CDN. Check your network or script links.");
+            // We cannot proceed without these, so we'll stop setup here, but the code structure remains the same.
+        }
+
         // --- SCENE CONFIGURATION PARAMETERS ---
         const CONFIG = {
             // RENDERER & ENVIRONMENT
-            TONE_MAPPING_EXPOSURE: 1.0,          // Adjusted exposure for a balanced look (1.0 is standard)
-            BACKGROUND_COLOR: 0x111111,          // KEY CHANGE: Dark background to create contrast for white objects
-            HDR_ENVIRONMENT_INTENSITY: 0.7,      // Strength of the loaded 'env.hdr' map
+            TONE_MAPPING_EXPOSURE: 1.0,          
+            BACKGROUND_COLOR: 0x111111,          
+            HDR_ENVIRONMENT_INTENSITY: 0.7,      
             
             // MATERIAL COLORS
-            CERAMIC_COLOR: 0xe8e8e8,             // Base color for sink, holder, etc.
-            METAL_COLOR: 0x444444,               // Color for gripper and suspension (Dark Gray)
-            LENS_EMISSIVE_COLOR: 0xffd8b0,       // Warm color for the light source
-            SHADE_BASE_COLOR: 0xffffff,          // Base color for the translucent shade
+            CERAMIC_COLOR: 0xe8e8e8,             
+            METAL_COLOR: 0x444444,               
+            LENS_EMISSIVE_COLOR: 0xffd8b0,       
+            SHADE_BASE_COLOR: 0xffffff,          
             
             // MATERIAL PROPERTIES
-            CERAMIC_ROUGHNESS: 1.0,              // Full roughness (matte look)
-            SHADE_TRANSMISSION: 0.9,             // High transmission (translucent)
+            CERAMIC_ROUGHNESS: 1.0,              
+            SHADE_TRANSMISSION: 0.9,             
             
             // LIGHT EMISSION INTENSITIES
-            LENS_EMISSIVE_INTENSITY: 40.0,       // Light source is now on (moderate intensity)
-            SHADE_EMISSIVE_INTENSITY: 0.0,       // Shade relies on the lens for illumination
+            LENS_EMISSIVE_INTENSITY: 40.0,       
+            SHADE_EMISSIVE_INTENSITY: 0.0,       
             
             // POST-PROCESSING (UNREAL BLOOM)
-            BLOOM_STRENGTH: 5.0,                 // Increased bloom strength
-            BLOOM_RADIUS: 0.5,                   // Spread of the glow effect
-            BLOOM_THRESHOLD: 0.9                 // Only colors above this brightness will bloom
+            BLOOM_STRENGTH: 5.0,                 
+            BLOOM_RADIUS: 0.5,                   
+            BLOOM_THRESHOLD: 0.9                 
         };
         // --------------------------------------
 
@@ -115,7 +129,14 @@
             controls.update();
             
             // 4. Setup Composers (Bloom Effect)
-            setupComposers();
+            // We check for the dependencies here, which should now be resolved by the explicit assignments above
+            if (RenderPass && EffectComposer && ShaderPass) {
+                 setupComposers();
+            } else {
+                 // Fallback: Use standard rendering if composers failed to load.
+                 console.warn("Falling back to standard rendering as post-processing composers were not found.");
+            }
+
 
             // 5. Load Assets
             loadHDRAndModels();
@@ -125,9 +146,7 @@
         }
         
         function setupComposers() {
-            // NOTE: RenderPass, UnrealBloomPass, EffectComposer, and ShaderPass are globally available 
-            // because they were loaded by <script> tags, so we use them without the 'THREE.' prefix.
-            
+            // RenderPass is now guaranteed to be defined if the check passed above
             const renderScene = new RenderPass(scene, camera);
             
             const bloomPass = new UnrealBloomPass(
@@ -303,28 +322,36 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            bloomComposer.setSize(window.innerWidth, window.innerHeight); 
-            finalComposer.setSize(window.innerWidth, window.innerHeight); 
+            
+            // Only resize composers if they were successfully initialized
+            if (bloomComposer && finalComposer) {
+                bloomComposer.setSize(window.innerWidth, window.innerHeight); 
+                finalComposer.setSize(window.innerWidth, window.innerHeight); 
+            }
         }
 
         function animate() {
             requestAnimationFrame(animate);
             if (controls) controls.update(); 
             
-            // 1. Render the scene, but make all non-glowing objects black
-            scene.traverse(darkenNonBloomed);
-            bloomComposer.render();
+            if (bloomComposer && finalComposer) {
+                // 1. Render the scene, but make all non-glowing objects black
+                scene.traverse(darkenNonBloomed);
+                bloomComposer.render();
 
-            // 2. Restore all original materials
-            scene.traverse(restoreMaterial);
-            
-            // 3. Render the final combined scene (original objects + bloom)
-            finalComposer.render();
+                // 2. Restore all original materials
+                scene.traverse(restoreMaterial);
+                
+                // 3. Render the final combined scene (original objects + bloom)
+                finalComposer.render();
+            } else {
+                // Fallback rendering
+                renderer.render(scene, camera);
+            }
         }
 
-        // FIX: Ensure 'init' runs only after all external scripts (like RenderPass.js) are loaded.
+        // Ensure 'init' runs only after the document structure and all scripts are loaded.
         window.onload = init;
-
     </script>
 </body>
 </html>
