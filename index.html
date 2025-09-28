@@ -108,9 +108,9 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.0,  // strength (Controls glow spread)
+                1.5,  // FIX: Increased strength to compensate for lower emissive value
                 0.2,  // radius (Controls glow radius)
-                0.5   // FIX: RAISED THRESHOLD (WAS 0.01) - This forces the brightest light source (lens, emissive 50) to be the main contributor to the bloom, reducing overall white saturation.
+                0.1   // FIX: Lowered threshold to include the shade glow again
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -222,7 +222,7 @@
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 50.0; // Extreme intensity for big bloom
+                            material.emissiveIntensity = 5.0; // FIX: Reduced from 50.0 to prevent clipping
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
