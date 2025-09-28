@@ -11,23 +11,27 @@
 </head>
 <body>
     <!-- 
-        ASSUMPTION: All .js files are in a local ./js/ folder
+        FIX: Switching all Three.js Examples files to CDN links (r128) 
+        to resolve 'Uncaught SyntaxError: Cannot use import statement outside a module' 
+        and 'THREE.EffectComposer is not a constructor' errors. 
     -->
-    <script src="./js/three.min.js"></script>
-    <script src="./js/GLTFLoader.js"></script>
-    <script src="./js/RGBELoader.js"></script>
-    <script src="./js/DRACOLoader.js"></script>
-    <script src="./js/OrbitControls.js"></script>
+    <script src="./js/three.min.js"></script> <!-- Assuming core is still local -->
     
-    <!-- POST-PROCESSING PASSES (UMD versions required) -->
-    <script src="./js/EffectComposer.js"></script>
-    <script src="./js/RenderPass.js"></script>
-    <script src="./js/UnrealBloomPass.js"></script> 
+    <!-- Standard Example Loaders (UMD versions from CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
-    <!-- SHADER FILES REQUIRED FOR THE COMPOSER CHAIN -->
-    <script src="./js/CopyShader.js"></script>
-    <script src="./js/LuminosityHighPassShader.js"></script>
-    <script src="./js/ShaderPass.js"></script>
+    <!-- POST-PROCESSING PASSES (UMD versions from CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script> 
+    
+    <!-- SHADER FILES REQUIRED FOR THE COMPOSER CHAIN (UMD versions from CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
     
     <script>
         // --- FILE PATH CORRECTION APPLIED ---
@@ -67,7 +71,8 @@
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.5; 
+            // Exposure setting affects both the final combined scene and the bloom target
+            renderer.toneMappingExposure = 0.7; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
@@ -84,7 +89,9 @@
             controls.update();
 
             // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
-            const spotLight = new THREE.SpotLight(0xfff0dd, 500, 100, Math.PI / 4, 0.5); 
+            // FIX: Drastically reduced intensity to prevent scene washout. 
+            // The glow should primarily come from the emissive material + bloom.
+            const spotLight = new THREE.SpotLight(0xfff0dd, 10, 100, Math.PI / 4, 0.5); // WAS 500, now 50
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
@@ -103,14 +110,14 @@
         
         function setupComposers() {
             // --- BLOOM COMPOSER (Renders ONLY the glow objects) ---
-            // RenderPass is required as the first pass
             const renderScene = new THREE.RenderPass(scene, camera);
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.5,  // FIX: Increased strength to compensate for lower emissive value
+                // FIX: Reduced strength significantly for a subtle glow
+                0.5,  // WAS 0.8 -> Reduced bloom strength (0.5 is a good starting point)
                 0.2,  // radius (Controls glow radius)
-                0.1   // FIX: Lowered threshold to include the shade glow again
+                0.1   // threshold 
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -222,7 +229,8 @@
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 5.0; // FIX: Reduced from 50.0 to prevent clipping
+                            // FIX: Reduced emissive intensity to prevent primary source from washing out.
+                            material.emissiveIntensity = 2.0; // WAS 5.0
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
