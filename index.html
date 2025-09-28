@@ -41,12 +41,12 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Set to Cineon for AGX-like softer highlight rolloff
+            // Cineon is the best AGX-like, non-clipping tone mapping option
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 1.2; // Optimized exposure for Cineon
+            renderer.toneMappingExposure = 1.2; // Moderate exposure for a bright studio HDR
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            // White background to match desired product presentation
+            // White background to match reference image
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
@@ -71,7 +71,7 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - Assuming a Neutral Studio HDR
+            // Load the HDR Environment Map - Should be the "Studio Small 01" or equivalent.
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
@@ -79,7 +79,7 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
 
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully. Assuming Neutral Studio HDR.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully. FINAL CODE ASSUMES A NEUTRAL STUDIO HDR.");
 
                     loadAllModels();
                 },
