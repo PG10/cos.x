@@ -11,7 +11,7 @@
 </head>
 <body>
     <!-- 
-        FIX: Switching all Three.js Examples files to CDN links (r128) 
+        Standard Three.js Libraries using CDN links (r128) 
     -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     
@@ -32,8 +32,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
     
     <script>
-        // --- FILE PATH CORRECTION APPLIED ---
-        // Assuming models are in the root directory (where index.html is)
+        // --- FILE PATHS ---
         const BANDS_MODEL_PATH      = './bands.glb';
         const FEEDS_MODEL_PATH      = './feeds.glb';
         const GRIPPER_MODEL_PATH    = './gripper.glb';
@@ -54,33 +53,28 @@
         bloomLayer.set(BLOOM_SCENE);
 
         const materials = {};
-        // Dark material used to hide non-glowing parts during the Bloom render pass
         const darkMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
         // ------------------------------
         
         function init() {
-            // --- EASY VIEW ADJUSTMENT VARIABLES ---
             const INITIAL_CAMERA_Z = 50.0; 
-            // --------------------------------------
 
             // 1. Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Cineon Tone Mapping (for soft, non-clipping highlights)
+            // Cineon Tone Mapping for soft highlights
             renderer.toneMapping = THREE.CineonToneMapping; 
-            // FIX: Drastically reduced exposure for white background
-            renderer.toneMappingExposure = 0.3; 
+            renderer.toneMappingExposure = 0.3; // Low exposure for white background
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            // FIX: Revert background to white
-            renderer.setClearColor(0xffffff); 
+            renderer.setClearColor(0xffffff); // White background
             document.body.appendChild(renderer.domElement);
 
             // 2. Setup Scene and Camera
             scene = new THREE.Scene();
-            // FIX: Boosted AmbientLight to ensure non-emissive parts are visible on white background
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Intensity 1.0
+            // High ambient light to illuminate non-glowing parts on a white background
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
             scene.add(ambientLight);
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
@@ -99,21 +93,16 @@
             loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
-            // CRUCIAL: Start the animation loop after setup
             animate();
         }
         
         function setupComposers() {
-            // --- BLOOM COMPOSER (Renders ONLY the glow objects) ---
             const renderScene = new THREE.RenderPass(scene, camera);
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                // FIX: Reduced strength for a tighter glow
-                0.5,  // strength
-                // FIX: Reduced radius for less atmospheric spread
-                0.3,  // radius
-                // Threshold kept high to only focus on the lens
+                0.5,  // strength (lower for white background)
+                0.3,  // radius (tighter glow)
                 0.85   // threshold 
             );
 
@@ -122,7 +111,6 @@
             bloomComposer.addPass(renderScene);
             bloomComposer.addPass(bloomPass);
 
-            // --- FINAL COMPOSER (Combines the original scene and the bloom texture) ---
             const finalPass = new THREE.ShaderPass(
                 new THREE.ShaderMaterial({
                     uniforms: {
@@ -141,7 +129,6 @@
                         uniform sampler2D bloomTexture;
                         varying vec2 vUv;
                         void main() {
-                            // Bloom multiplier reduced slightly due to high ambient light
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
                             gl_FragColor = baseColor + (bloomColor * 1.0); 
@@ -158,15 +145,14 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map (env.hdr is assumed to be in the root directory)
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
-                    // FIX: Halved the environment map intensity so it contributes less to the overall brightness
                     scene.environment = texture; 
-                    renderer.autoClear = false; // Important for bloom to work
-                    scene.environmentIntensity = 0.5; // New property (Three.js r128 compatible)
+                    renderer.autoClear = false; 
+                    // Lower environment map contribution to rely more on AmbientLight
+                    scene.environmentIntensity = 0.1; 
                     loadAllModels();
                 },
                 undefined, 
@@ -176,7 +162,6 @@
 
         function loadAllModels() {
             const dracoLoader = new THREE.DRACOLoader();
-            // DRACO PATH CORRECTION: Assuming 'draco' folder is next to index.html
             dracoLoader.setDecoderPath('./draco/'); 
             
             const gltfLoader = new THREE.GLTFLoader();
@@ -206,43 +191,43 @@
                         }
 
                         // --- APPLY FINAL PBR AND GLOW PROPERTIES ---
-                        material.metalness = 0.0;
-                        material.roughness = 0.5;
-                        material.color.set(0xffffff);
                         material.emissive.set(0x000000); // Base emissive reset
-                        
-                        // Set all models to the base scene layer by default
                         child.layers.set(ENTIRE_SCENE); 
 
                         if (modelName === 'shade') {
                             // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL 
                             material.transmission = 0.8; 
-                            // FIX: Increased thickness slightly to help the shade stand out
                             material.thickness = 0.8; 
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
                             material.roughness = 0.9; 
+                            material.metalness = 0.0;
+                            material.color.set(0xffffff);
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
-                            // Emissive kept low so the shade itself doesn't bloom too much
                             material.emissiveIntensity = 0.5; 
-                            child.layers.enable(BLOOM_SCENE); // Glows
+                            child.layers.enable(BLOOM_SCENE); 
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // Lens emissive kept high to ensure it passes the high bloom threshold
                             material.emissiveIntensity = 20.0; 
-                            child.layers.enable(BLOOM_SCENE); // Glows
+                            child.layers.enable(BLOOM_SCENE); 
 
-                        } else if (modelName === 'gripper' || modelName === 'suspension' || modelName === 'sink') {
-                            // METAL PARTS (Do NOT glow)
-                            material.metalness = 0.9; 
-                            material.roughness = modelName === 'gripper' ? 0.5 : 0.2; 
-                            // Set metallic colors to a neutral gray that will be clearly visible against white due to high ambient light
-                            material.color.set(0x444444);
+                        } else if (modelName === 'sink' || modelName === 'holder' || modelName === 'bands' || modelName === 'feeds') {
+                            // CERAMIC/PLASTIC PARTS (Matte Off-White)
+                            material.metalness = 0.0; // Non-metallic
+                            material.roughness = 0.9; // Very rough/matte texture
+                            // Using a very bright off-white to allow subtle shadow details to appear
+                            material.color.set(0xf5f5f5); 
+                            
+                        } else if (modelName === 'gripper' || modelName === 'suspension') {
+                            // METAL PARTS (Dark Gray Chrome)
+                            material.metalness = 0.9; // Highly metallic
+                            material.roughness = 0.5; // Slightly rougher metal
+                            material.color.set(0x444444); // Dark gray color
                         }
                         
                         child.material.needsUpdate = true;
@@ -250,7 +235,6 @@
                     }
                 });
                 
-                // Positioning
                 loadedModel.position.set(0, 0, 0); 
                 loadedModel.scale.set(1.0, 1.0, 1.0);
                 scene.add(loadedModel);
@@ -269,14 +253,12 @@
         // --- SELECTIVE BLOOM RENDER UTILITIES ---
         function darkenNonBloomed(obj) {
             if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
-                // Save the original material and replace it with black
                 materials[obj.uuid] = obj.material;
                 obj.material = darkMaterial;
             }
         }
 
         function restoreMaterial(obj) {
-            // Restore the original material
             if (materials[obj.uuid]) {
                 obj.material = materials[obj.uuid];
                 delete materials[obj.uuid];
