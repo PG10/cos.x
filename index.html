@@ -17,19 +17,19 @@
     <script src="./js/OrbitControls.js"></script>
 
     <script>
-        // --- FILE PATHS (Using the confirmed working ABSOLUTE paths for GitHub Pages) ---
-        const MODEL_PATH = '/cos.x/sink.glb';    
-        // Must match the renamed file for the 404 fix.
+        // --- FILE PATHS (Using the confirmed working ABSOLUTE paths) ---
+        const SINK_MODEL_PATH = '/cos.x/sink.glb';    
+        const SHADE_MODEL_PATH = '/cos.x/shade.glb';
         const HDRI_PATH = '/cos.x/env.hdr'; 
 
-        let scene, camera, renderer, model, controls; 
+        let scene, camera, renderer, controls;
+        let sinkModel, shadeModel; 
 
         function init() {
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // REALISM FIX: Lower exposure for better contrast and HDRI shadow definition
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 0.5; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
@@ -38,17 +38,21 @@
 
             // Setup Scene and Camera
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            camera.position.set(200.0, 100.0, 300.0); 
+            // Camera setup with increased far plane
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // ORBITCONTROLS SETUP (Rotation, Pan, and Zoom)
+            // *** FINAL FIX: EXTREMELY large coordinates for guaranteed zoomed-out start ***
+            // X, Y, Z coordinates are now 10x larger than the previous attempt.
+            camera.position.set(1500.0, 750.0, 2250.0); 
+            
+            // OrbitControls Setup
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             
             // Allows full zoom control (in and out)
             controls.minDistance = 0.05; 
-            controls.maxDistance = 50.0; // Increased maxDistance for further zoom if needed
+            controls.maxDistance = 5000.0; // Increased maxDistance to match camera range
 
             controls.enableDamping = true;
             controls.update();
@@ -64,7 +68,7 @@
                     scene.environment = envMap; 
                     texture.dispose();
                     pmremGenerator.dispose();
-                    loadModel();
+                    loadAllModels(); 
                 }, undefined, function (error) {
                     console.error('HDRI Load Error:', error); 
                 });
@@ -73,32 +77,55 @@
             animate();
         }
 
-        function loadModel() {
-            // DRACO Path Fix: Absolute path is essential for the decoder files.
+        function loadAllModels() {
             const dracoLoader = new THREE.DRACOLoader();
             dracoLoader.setDecoderPath('/cos.x/draco/'); 
+            const gltfLoader = new THREE.GLTFLoader();
+            gltfLoader.setDRACOLoader(dracoLoader);
 
-            const loader = new THREE.GLTFLoader();
-            loader.setDRACOLoader(dracoLoader);
+            let modelsLoaded = 0;
+            const totalModels = 2; 
 
-            loader.load(MODEL_PATH, function (gltf) {
-                model = gltf.scene;
+            const onModelLoaded = (gltf, modelName) => {
+                const loadedModel = gltf.scene;
                 
-                // REALISM FIX: Apply Material Properties to all meshes
-                model.traverse((child) => {
+                // Apply realism material properties
+                loadedModel.traverse((child) => {
                     if (child.isMesh) {
                         const material = child.material;
-                        
-                        // Add subtle metallic and smoothness for a more realistic look
                         material.metalness = 0.2; 
                         material.roughness = 0.4;  
                         material.needsUpdate = true;
                     }
                 });
-                
-                scene.add(model);
-            }, undefined, function (error) {
-                console.error('GLB Load Error:', error);
+
+                // Store and position models
+                if (modelName === 'sink') {
+                    sinkModel = loadedModel;
+                    // sinkModel.position.set(0, 0, 0); 
+                    scene.add(sinkModel);
+                } else if (modelName === 'shade') {
+                    shadeModel = loadedModel;
+                    // Position shade relative to sink (adjust based on model size)
+                    shadeModel.position.set(0, 1.0, 0); 
+                    shadeModel.scale.set(0.5, 0.5, 0.5); 
+                    scene.add(shadeModel);
+                }
+
+                modelsLoaded++;
+                if (modelsLoaded === totalModels) {
+                    console.log("All models loaded successfully!");
+                }
+            };
+
+            // Load sink model
+            gltfLoader.load(SINK_MODEL_PATH, (gltf) => onModelLoaded(gltf, 'sink'), undefined, (error) => {
+                console.error('Sink Model Load Error:', error);
+            });
+
+            // Load shade model
+            gltfLoader.load(SHADE_MODEL_PATH, (gltf) => onModelLoaded(gltf, 'shade'), undefined, (error) => {
+                console.error('Shade Model Load Error:', error);
             });
         }
 
@@ -110,7 +137,6 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            // Update controls for smooth rotation/panning
             if (controls && controls.enableDamping) controls.update(); 
             renderer.render(scene, camera);
         }
