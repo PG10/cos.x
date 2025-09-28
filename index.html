@@ -42,9 +42,10 @@
             // Camera setup with increased far plane
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // *** FINAL FIX: EXTREMELY large coordinates for guaranteed zoomed-out start ***
-            // X, Y, Z coordinates are now 10x larger than the previous attempt.
-            camera.position.set(1500.0, 750.0, 2250.0); 
+            // *** FIX: Reduced coordinates to zoom in closer to the model on start ***
+            // You can easily adjust these three numbers (X, Y, Z) now:
+            // Larger numbers zoom out; smaller numbers zoom in.
+            camera.position.set(100.0, 50.0, 150.0); 
             
             // OrbitControls Setup
             controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -52,7 +53,7 @@
             
             // Allows full zoom control (in and out)
             controls.minDistance = 0.05; 
-            controls.maxDistance = 5000.0; // Increased maxDistance to match camera range
+            controls.maxDistance = 5000.0; // Keep this large to allow zooming out if needed
 
             controls.enableDamping = true;
             controls.update();
