@@ -41,11 +41,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // *** TONE MAPPING CHANGE: Switching to Cineon (a softer alternative to ACES) ***
-            renderer.toneMapping = THREE.CineonToneMapping; 
-            
-            // Exposure reduced as Cineon handles highlights better
-            renderer.toneMappingExposure = 0.8; 
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+            // Exposure boosted to ensure bright whites
+            renderer.toneMappingExposure = 2.0; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             renderer.setClearColor(0x000000); 
@@ -64,6 +62,12 @@
             controls.maxDistance = MAX_ZOOM_DISTANCE; 
             controls.enableDamping = true;
             controls.update();
+
+            // *** FIX: ADD REAL POINT LIGHT FOR PHYSICAL ILLUMINATION ***
+            const pointLight = new THREE.PointLight(0xffeebb, 100, 100);
+            pointLight.position.set(0, 0, 0); // Positioned inside the shade (at the center of the scene)
+            scene.add(pointLight);
+            // -----------------------------------------------------------
 
             loadHDRAndModels();
 
@@ -105,8 +109,6 @@
                 'gripper': GRIPPER_MODEL_PATH,
                 'holder': HOLDER_MODEL_PATH,
                 'lens': LENS_MODEL_PATH,
-                'shade': SHADE_MODEL_PATH,
-                'sink': SINK_MODEL_PATH,    
                 'suspension': SUSPENSION_MODEL_PATH
             };
 
@@ -118,19 +120,18 @@
                         
                         let material = child.material;
 
-                        // Reset properties and ensure it's a Standard Material
+                        // Ensure properties are reset and it's a Standard Material
                         material.transparent = false;
                         material.opacity = 1.0;
                         material.emissive.set(0x000000);
                         material.emissiveIntensity = 0.0;
                         
                         if (!material.isMeshStandardMaterial) {
-                            // Ensure all materials are PBR MeshStandardMaterial
                             material = new THREE.MeshStandardMaterial().copy(material);
                             child.material = material;
                         }
 
-                        // --- MATERIAL CUSTOMIZATION (Targeting Pure White & Glow) ---
+                        // --- MATERIAL CUSTOMIZATION ---
                         let metalness = 0.0;
                         let roughness = 0.5;
                         let color = 0xffffff;
@@ -152,10 +153,10 @@
                             material.emissiveIntensity = 0.5; 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The light source)
+                            // WARM EMISSIVE LENS (The visual light source)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 15.0; // High intensity light source
+                            material.emissiveIntensity = 15.0; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -192,7 +193,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Cineon Tone Mapping Applied. Ready for final visual check.");
+                    console.log("Point Light and Exposure fix applied. Final render attempt.");
                 }
             };
             
