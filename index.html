@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { margin: 0; overflow: hidden; }
+        body { margin: 0; overflow: hidden; background: #111; }
         canvas { display: block; }
         #loading {
             position: fixed;
@@ -39,20 +39,33 @@
 </head>
 <body>
     <div id="loading">Loading LED Fixture...</div>
-    <div id="controls">
+    <div id="controls" style="display: none;">
         <label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="10" step="0.1" value="5.0"></label>
         <label>Emission Power: <input type="range" id="emissionIntensity" min="0" max="100" step="1" value="40"></label>
         <label>Exposure: <input type="range" id="exposure" min="0" max="3" step="0.1" value="1.0"></label>
+    </style>
     </div>
 
-    <!-- Reliable Three.js CDN URLs for r128 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/RGBELoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/DRACOLoader.js"></script>
-    
-    <script>
+    <!-- Local Three.js files - no CDN dependency -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./js/three.module.js",
+            "three/addons/": "./js/addons/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+        import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+        // Update loading status
+        document.getElementById('loading').textContent = 'Initializing LED Fixture...';
+
         // --- SCENE CONFIGURATION PARAMETERS ---
         const CONFIG = {
             // RENDERER & ENVIRONMENT
@@ -80,7 +93,7 @@
             BLOOM_THRESHOLD: 0.9                 
         };
 
-        // --- FILE PATHS (Restored from your original) ---
+        // --- FILE PATHS (Your original GLB models) ---
         const BANDS_MODEL_PATH      = './bands.glb';
         const FEEDS_MODEL_PATH      = './feeds.glb';
         const GRIPPER_MODEL_PATH    = './gripper.glb';
@@ -96,10 +109,10 @@
         let modelsLoaded = 0;
         const totalModels = 8;
         
-        // Custom bloom implementation (avoiding problematic post-processing CDN)
-        let bloomRenderTarget, baseRenderTarget;
-        let bloomMaterial, compositeMaterial;
-        let bloomScene, darkMaterial;
+        // Bloom effect variables
+        let bloomRenderTarget;
+        let bloomMaterial;
+        let darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
         let bloomLayer = new THREE.Layers();
         let materials = {};
         
@@ -107,13 +120,8 @@
         bloomLayer.set(1);
         
         function init() {
-            // Check if Three.js loaded properly
-            if (typeof THREE === 'undefined') {
-                console.error('Three.js failed to load');
-                document.getElementById('loading').innerHTML = 'Error: Three.js failed to load';
-                return;
-            }
-
+            console.log('Initializing LED Fixture...');
+            
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -132,13 +140,21 @@
             camera.position.set(0.0, 10.0, 50.0); 
             
             // Controls
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls = new OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             controls.enableDamping = true;
             controls.update();
             
-            // Setup custom bloom effect
-            setupCustomBloom();
+            // Setup bloom effect
+            setupBloomEffect();
+            
+            // Add basic lighting as fallback
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 10, 5);
+            scene.add(directionalLight);
             
             // Load HDR and Models
             loadHDRAndModels();
@@ -148,21 +164,27 @@
 
             window.addEventListener('resize', onWindowResize, false);
             animate();
+            
+            // Show controls
+            document.getElementById('controls').style.display = 'block';
         }
         
-        function setupCustomBloom() {
-            // Create render targets
-            bloomRenderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
-            baseRenderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        function setupBloomEffect() {
+            // Create render target for bloom
+            bloomRenderTarget = new THREE.WebGLRenderTarget(
+                window.innerWidth, 
+                window.innerHeight,
+                {
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter,
+                    format: THREE.RGBAFormat
+                }
+            );
             
-            // Dark material for non-bloom objects
-            darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-            
-            // Bloom extraction material
+            // Simple bloom shader
             bloomMaterial = new THREE.ShaderMaterial({
                 uniforms: {
                     tDiffuse: { value: null },
-                    threshold: { value: CONFIG.BLOOM_THRESHOLD },
                     strength: { value: CONFIG.BLOOM_STRENGTH }
                 },
                 vertexShader: `
@@ -174,94 +196,73 @@
                 `,
                 fragmentShader: `
                     uniform sampler2D tDiffuse;
-                    uniform float threshold;
                     uniform float strength;
                     varying vec2 vUv;
-                    
-                    vec3 luma = vec3(0.299, 0.587, 0.114);
-                    
                     void main() {
                         vec4 color = texture2D(tDiffuse, vUv);
-                        float brightness = dot(color.rgb, luma);
-                        
-                        float contribution = max(0.0, brightness - threshold);
-                        contribution /= max(brightness, 0.00001);
-                        
-                        gl_FragColor = color * contribution * strength;
-                    }
-                `
-            });
-            
-            // Composite material
-            compositeMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    baseTexture: { value: null },
-                    bloomTexture: { value: bloomRenderTarget.texture }
-                },
-                vertexShader: `
-                    varying vec2 vUv;
-                    void main() {
-                        vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        gl_FragColor = color * strength;
                     }
                 `,
-                fragmentShader: `
-                    uniform sampler2D baseTexture;
-                    uniform sampler2D bloomTexture;
-                    varying vec2 vUv;
-                    void main() {
-                        vec4 base = texture2D(baseTexture, vUv);
-                        vec4 bloom = texture2D(bloomTexture, vUv);
-                        gl_FragColor = base + bloom * 0.8;
-                    }
-                `
+                blending: THREE.AdditiveBlending,
+                transparent: true
             });
         }
 
         function loadHDRAndModels() {
-            // Loading HDR texture
-            new THREE.RGBELoader()
-                .setPath('./') 
-                .load('env.hdr', function (texture) {
+            // Try to load HDR environment
+            const rgbeLoader = new RGBELoader();
+            rgbeLoader.setPath('./');
+            rgbeLoader.load('env.hdr', 
+                function (texture) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
-                    scene.environment = texture; 
-                    scene.environmentIntensity = CONFIG.HDR_ENVIRONMENT_INTENSITY; 
-                    loadAllModels();
+                    scene.environment = texture;
+                    scene.environmentIntensity = CONFIG.HDR_ENVIRONMENT_INTENSITY;
+                    console.log('HDR environment loaded successfully');
                 },
-                undefined, 
-                (error) => {
-                     console.warn("Could not load 'env.hdr'. Proceeding without environment map.", error);
-                     loadAllModels();
+                undefined,
+                function (error) {
+                    console.warn('Could not load HDR environment:', error);
                 }
             );
+            
+            // Load all models
+            loadAllModels();
         }
 
         function loadAllModels() {
-            const dracoLoader = new THREE.DRACOLoader();
+            const dracoLoader = new DRACOLoader();
             dracoLoader.setDecoderPath('./draco/'); 
             
-            const gltfLoader = new THREE.GLTFLoader();
+            const gltfLoader = new GLTFLoader();
             gltfLoader.setDRACOLoader(dracoLoader);
 
             const modelPaths = {
-                'sink': SINK_MODEL_PATH, 'shade': SHADE_MODEL_PATH, 'bands': BANDS_MODEL_PATH, 
-                'feeds': FEEDS_MODEL_PATH, 'gripper': GRIPPER_MODEL_PATH, 'holder': HOLDER_MODEL_PATH, 
-                'lens': LENS_MODEL_PATH, 'suspension': SUSPENSION_MODEL_PATH
+                'sink': SINK_MODEL_PATH, 
+                'shade': SHADE_MODEL_PATH, 
+                'bands': BANDS_MODEL_PATH, 
+                'feeds': FEEDS_MODEL_PATH, 
+                'gripper': GRIPPER_MODEL_PATH, 
+                'holder': HOLDER_MODEL_PATH, 
+                'lens': LENS_MODEL_PATH, 
+                'suspension': SUSPENSION_MODEL_PATH
             };
 
             const isCeramicPart = (name) => 
                 name === 'sink' || name === 'holder' || name === 'bands' || name === 'feeds';
             
             const onModelLoaded = (gltf, modelName) => {
+                console.log(`Loading model: ${modelName}`);
                 const loadedModel = gltf.scene;
                 
                 loadedModel.traverse((child) => {
                     if (child.isMesh) {
                         let material = child.material;
                         
-                        // Ensure material is MeshPhysicalMaterial for PBR and transmission
+                        // Ensure material is MeshPhysicalMaterial for PBR
                         if (!material.isMeshPhysicalMaterial) {
-                            material = new THREE.MeshPhysicalMaterial().copy(material);
+                            material = new THREE.MeshPhysicalMaterial();
+                            if (child.material.map) material.map = child.material.map;
+                            if (child.material.color) material.color = child.material.color;
                             child.material = material;
                         }
 
@@ -316,8 +317,11 @@
                 
                 // Update loading progress
                 modelsLoaded++;
+                document.getElementById('loading').textContent = `Loading models... ${modelsLoaded}/${totalModels}`;
+                
                 if (modelsLoaded === totalModels) {
                     document.getElementById('loading').style.display = 'none';
+                    console.log('All models loaded successfully');
                 }
             };
             
@@ -325,7 +329,9 @@
             Object.keys(modelPaths).forEach(modelName => {
                 gltfLoader.load(modelPaths[modelName], 
                     (gltf) => onModelLoaded(gltf, modelName), 
-                    undefined, 
+                    (progress) => {
+                        console.log(`Loading ${modelName}: ${(progress.loaded / progress.total * 100)}%`);
+                    },
                     (error) => {
                         console.error(`Error loading ${modelName}:`, error);
                         modelsLoaded++; // Still increment to prevent hanging
@@ -344,7 +350,9 @@
             
             bloomSlider.addEventListener('input', (e) => {
                 CONFIG.BLOOM_STRENGTH = parseFloat(e.target.value);
-                bloomMaterial.uniforms.strength.value = CONFIG.BLOOM_STRENGTH;
+                if (bloomMaterial) {
+                    bloomMaterial.uniforms.strength.value = CONFIG.BLOOM_STRENGTH;
+                }
             });
             
             emissionSlider.addEventListener('input', (e) => {
@@ -359,7 +367,7 @@
             });
         }
         
-        // Selective bloom render utilities
+        // Selective bloom utilities
         function darkenNonBloomed(obj) {
             if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
                 materials[obj.uuid] = obj.material;
@@ -379,64 +387,35 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            if (bloomRenderTarget && baseRenderTarget) {
+            if (bloomRenderTarget) {
                 bloomRenderTarget.setSize(window.innerWidth, window.innerHeight);
-                baseRenderTarget.setSize(window.innerWidth, window.innerHeight);
             }
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            
             if (controls) controls.update(); 
             
-            // Custom bloom rendering
-            if (bloomRenderTarget && baseRenderTarget) {
-                // 1. Render scene normally to base target
-                renderer.setRenderTarget(baseRenderTarget);
-                renderer.render(scene, camera);
-                
-                // 2. Render only emissive objects for bloom
+            // Render scene with bloom effect
+            if (bloomRenderTarget && lensObjects.length > 0) {
+                // 1. Render only emissive objects to bloom target
                 scene.traverse(darkenNonBloomed);
                 renderer.setRenderTarget(bloomRenderTarget);
                 renderer.render(scene, camera);
                 scene.traverse(restoreMaterial);
                 
-                // 3. Composite final result to screen
+                // 2. Render normal scene to screen
                 renderer.setRenderTarget(null);
-                
-                // Use a simple additive blend by rendering both targets
                 renderer.render(scene, camera);
                 
-                // Add bloom on top (simplified approach)
+                // 3. Add bloom on top (simplified)
                 const bloomQuad = new THREE.Mesh(
                     new THREE.PlaneGeometry(2, 2),
-                    new THREE.ShaderMaterial({
-                        uniforms: {
-                            tDiffuse: { value: bloomRenderTarget.texture },
-                            strength: { value: 0.8 }
-                        },
-                        vertexShader: `
-                            varying vec2 vUv;
-                            void main() {
-                                vUv = uv;
-                                gl_Position = vec4(position, 1.0);
-                            }
-                        `,
-                        fragmentShader: `
-                            uniform sampler2D tDiffuse;
-                            uniform float strength;
-                            varying vec2 vUv;
-                            void main() {
-                                vec4 bloom = texture2D(tDiffuse, vUv);
-                                gl_FragColor = bloom * strength;
-                            }
-                        `,
-                        blending: THREE.AdditiveBlending,
-                        transparent: true
-                    })
+                    bloomMaterial
                 );
+                bloomMaterial.uniforms.tDiffuse.value = bloomRenderTarget.texture;
                 
-                // Render bloom overlay
                 const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
                 const orthoScene = new THREE.Scene();
                 orthoScene.add(bloomQuad);
@@ -448,17 +427,9 @@
             }
         }
 
-        // Initialize when page loads (with delay to ensure scripts load)
-        function initWhenReady() {
-            if (typeof THREE !== 'undefined' && THREE.GLTFLoader && THREE.RGBELoader && THREE.OrbitControls) {
-                init();
-            } else {
-                console.log('Waiting for Three.js to load...');
-                setTimeout(initWhenReady, 100);
-            }
-        }
-        
-        window.addEventListener('load', initWhenReady);
+        // Start initialization
+        init();
+
     </script>
 </body>
 </html>
