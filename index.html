@@ -60,14 +60,221 @@ const CONFIG = {
 
 // --- MODEL PATHS ---
 const modelPaths = {
-  'sink':'./models/sink.glb',
-  'shade':'./models/shade.glb',
-  'bands':'./models/bands.glb',
-  'feeds':'./models/feeds.glb',
-  'gripper':'./models/gripper.glb',
-  'holder':'./models/holder.glb',
-  'lens':'./models/lens.glb',
-  'suspension':'./models/suspension.glb'
+  sink:'./models/sink.glb',
+  shade:'./models/shade.glb',
+  bands:'./models/bands.glb',
+  feeds:'./models/feeds.glb',
+  gripper:'./models/gripper.glb',
+  holder:'./models/holder.glb',
+  lens:'./models/lens.glb',
+  suspension:'./models/suspension.glb'
+};
+
+let scene, camera, renderer, controls, composer;
+let lensObjects=[], shadeObjects=[];
+let bloomPass;
+let modelsLoaded=0, totalModels=Object.keys(modelPaths).length;
+
+function init() {
+  renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = CONFIG.TONE_MAPPING_EXPOSURE;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight,0.1,100);
+  camera.position.set(0,1.5,3);
+
+  controls = new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true;
+  controls.autoRotate=true;
+
+  // HDR environment
+  new RGBELoader().setPath('./').load('env.hdr', texture=>{
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    scene.environment = texture;
+  });
+
+  // Bloom
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene,camera));
+  bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth,window.innerHeight),
+    CONFIG.BLOOM_STRENGTH, CONFIG.BLOOM_RADIUS, CONFIG.BLOOM_THRESHOLD);
+  composer.addPass(bloomPass);
+
+  loadAllModels();
+  setupUIControls();
+  window.addEventListener('resize',onWindowResize,false);
+  animate();
+  document.getElementById('controls').style.display='block';
+}
+
+function loadAllModels(){
+  const dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath('./js/addons/libs/draco/'); // Draco decoder path
+
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(dracoLoader);
+
+  function loadPart(path, name, onMesh){
+    loader.load(path, gltf=>{
+      const obj = gltf.scene;
+      obj.traverse(child=>{ if(child.isMesh) onMesh(child); });
+      scene.add(obj);
+      modelsLoaded++;
+      document.getElementById('loading').textContent=`Loading models... ${modelsLoaded}/${totalModels}`;
+      if(modelsLoaded===totalModels){
+        document.getElementById('loading').style.display='none';
+        const bulbLight = new THREE.PointLight(0xffd8b0,50,100);
+        bulbLight.position.set(0,-0.5,0);
+        scene.add(bulbLight);
+      }
+    });
+  }
+
+  loadPart(modelPaths.shade,'shade',mesh=>{
+    mesh.material = new THREE.MeshPhysicalMaterial({
+      color:CONFIG.SHADE_BASE_COLOR,
+      roughness:CONFIG.CERAMIC_ROUGHNESS,
+      metalness:0,
+      transmission:CONFIG.SHADE_TRANSMISSION,
+      thickness:2,
+      emissive:new THREE.Color(0xffd8b0),
+      emissiveIntensity:CONFIG.SHADE_EMISSIVE_INTENSITY
+    });
+    shadeObjects.push(mesh);
+  });
+
+  loadPart(modelPaths.lens,'lens',mesh=>{
+    mesh.material = new THREE.MeshPhysicalMaterial({
+      color:0xffffff,
+      roughness:0.3,
+      emissive:new THREE.Color(CONFIG.LENS_EMISSIVE_COLOR),
+      emissiveIntensity:CONFIG.LENS_EMISSIVE_INTENSITY
+    });
+    lensObjects.push(mesh);
+  });
+
+  const standardMaterialLoader = (color, roughness, metalness)=>mesh=>{
+    mesh.material = new THREE.MeshStandardMaterial({color,roughness,metalness});
+  };
+  loadPart(modelPaths.holder,'holder',standardMaterialLoader(CONFIG.CERAMIC_COLOR,CONFIG.CERAMIC_ROUGHNESS,0));
+  loadPart(modelPaths.bands,'bands',standardMaterialLoader(CONFIG.CERAMIC_COLOR,CONFIG.CERAMIC_ROUGHNESS,0.1));
+  loadPart(modelPaths.feeds,'feeds',standardMaterialLoader(CONFIG.CERAMIC_COLOR,CONFIG.CERAMIC_ROUGHNESS,0));
+  loadPart(modelPaths.gripper,'gripper',standardMaterialLoader(CONFIG.METAL_COLOR,0.4,1));
+  loadPart(modelPaths.suspension,'suspension',standardMaterialLoader(0x222222,0.7,0.3));
+  loadPart(modelPaths.sink,'sink',standardMaterialLoader(CONFIG.METAL_COLOR,0.6,0.8));
+}
+
+function setupUIControls(){
+  const bloomSlider=document.getElementById('bloomStrength');
+  const emissionSlider=document.getElementById('emissionIntensity');
+  const exposureSlider=document.getElementById('exposure');
+
+  bloomSlider.addEventListener('input',e=>bloomPass.strength=parseFloat(e.target.value));
+  emissionSlider.addEventListener('input',e=>{
+    const intensity = parseFloat(e.target.value);
+    lensObjects.forEach(mesh=>mesh.material.emissiveIntensity=intensity);
+    shadeObjects.forEach(mesh=>mesh.material.emissiveIntensity=intensity*0.05);
+  });
+  exposureSlider.addEventListener('input',e=>renderer.toneMappingExposure=parseFloat(e.target.value));
+}
+
+function onWindowResize(){
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+  composer.setSize(window.innerWidth,window.innerHeight);
+}
+
+const clock=new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  const pulse = 0.5 + Math.sin(t*2)*0.5;
+  lensObjects.forEach(mesh=>mesh.material.emissiveIntensity=CONFIG.LENS_EMISSIVE_INTENSITY*pulse);
+  shadeObjects.forEach(mesh=>mesh.material.emissiveIntensity=CONFIG.SHADE_EMISSIVE_INTENSITY*pulse);
+  controls.update();
+  composer.render();
+}
+
+init();
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LED Fixture Model</title>
+<style>
+body { margin:0; overflow:hidden; background:#111; }
+canvas { display:block; }
+#loading {
+  position: fixed; top:50%; left:50%;
+  transform: translate(-50%, -50%);
+  color:white; font-size:18px;
+  z-index:1000;
+}
+#controls {
+  position: fixed; top:20px; right:20px;
+  background: rgba(0,0,0,0.7);
+  padding:15px; border-radius:8px;
+  color:white; font-size:14px;
+  z-index:1000;
+}
+#controls label { display:block; margin:5px 0; }
+#controls input[type="range"] { width:150px; margin-left:10px; }
+</style>
+</head>
+<body>
+<div id="loading">Loading LED Fixture...</div>
+<div id="controls" style="display:none;">
+<label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="10" step="0.1" value="1.2"></label>
+<label>Emission Power: <input type="range" id="emissionIntensity" min="0" max="50" step="1" value="10"></label>
+<label>Exposure: <input type="range" id="exposure" min="0" max="3" step="0.1" value="1.2"></label>
+</div>
+
+<script type="module">
+import * as THREE from './js/three.module.js';
+import { OrbitControls } from './js/addons/controls/OrbitControls.js';
+import { GLTFLoader } from './js/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from './js/addons/loaders/DRACOLoader.js';
+import { RGBELoader } from './js/addons/loaders/RGBELoader.js';
+import { EffectComposer } from './js/addons/EffectComposer.js';
+import { RenderPass } from './js/addons/RenderPass.js';
+import { UnrealBloomPass } from './js/addons/UnrealBloomPass.js';
+
+// --- CONFIG ---
+const CONFIG = {
+  TONE_MAPPING_EXPOSURE:1.2,
+  CERAMIC_COLOR:0xe8e8e8,
+  METAL_COLOR:0x444444,
+  LENS_EMISSIVE_COLOR:0xfff2e0,
+  SHADE_BASE_COLOR:0xffffff,
+  CERAMIC_ROUGHNESS:0.9,
+  SHADE_TRANSMISSION:0.9,
+  LENS_EMISSIVE_INTENSITY:10.0,
+  SHADE_EMISSIVE_INTENSITY:0.05,
+  BLOOM_STRENGTH:1.2,
+  BLOOM_RADIUS:0.6,
+  BLOOM_THRESHOLD:0.8
+};
+
+// --- MODEL PATHS ---
+const modelPaths = {
+  sink:'./models/sink.glb',
+  shade:'./models/shade.glb',
+  bands:'./models/bands.glb',
+  feeds:'./models/feeds.glb',
+  gripper:'./models/gripper.glb',
+  holder:'./models/holder.glb',
+  lens:'./models/lens.glb',
+  suspension:'./models/suspension.glb'
 };
 
 let scene, camera, renderer, controls, composer;
