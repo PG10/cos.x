@@ -63,9 +63,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Cineon Tone Mapping for soft highlights
+            // Increased exposure slightly to brighten the overall scene.
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.3; // Low exposure for white background
+            renderer.toneMappingExposure = 0.5; // Increased from 0.3
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             renderer.setClearColor(0xffffff); // White background
@@ -151,7 +151,7 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
                     renderer.autoClear = false; 
-                    // Lower environment map contribution to rely more on AmbientLight
+                    // Low environment map contribution to rely more on AmbientLight
                     scene.environmentIntensity = 0.1; 
                     loadAllModels();
                 },
@@ -173,6 +173,9 @@
                 'lens': LENS_MODEL_PATH, 'suspension': SUSPENSION_MODEL_PATH
             };
 
+            const isWhitePart = (name) => 
+                name === 'sink' || name === 'holder' || name === 'bands' || name === 'feeds';
+            
             const onModelLoaded = (gltf, modelName) => {
                 const loadedModel = gltf.scene;
                 
@@ -181,12 +184,9 @@
                         
                         let material = child.material;
                         
-                        // Ensure it's a PBR material
-                        if (modelName === 'shade' && !material.isMeshPhysicalMaterial) {
+                        // Force MeshPhysicalMaterial for more control and robustness
+                        if (!material.isMeshPhysicalMaterial) {
                             material = new THREE.MeshPhysicalMaterial().copy(material);
-                            child.material = material;
-                        } else if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) {
-                            material = new THREE.MeshStandardMaterial().copy(material);
                             child.material = material;
                         }
 
@@ -216,18 +216,18 @@
                             material.emissiveIntensity = 20.0; 
                             child.layers.enable(BLOOM_SCENE); 
 
-                        } else if (modelName === 'sink' || modelName === 'holder' || modelName === 'bands' || modelName === 'feeds') {
-                            // CERAMIC/PLASTIC PARTS (Matte Off-White)
-                            material.metalness = 0.0; // Non-metallic
-                            material.roughness = 0.9; // Very rough/matte texture
-                            // Using a very bright off-white to allow subtle shadow details to appear
-                            material.color.set(0xf5f5f5); 
+                        } else if (isWhitePart(modelName)) {
+                            // CERAMIC/PLASTIC PARTS (Matte White)
+                            // Force pure white and extremely high roughness to avoid metallic look
+                            material.metalness = 0.0; 
+                            material.roughness = 1.0; // Max roughness (pure matte)
+                            material.color.set(0xffffff); // Pure white
                             
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
                             // METAL PARTS (Dark Gray Chrome)
-                            material.metalness = 0.9; // Highly metallic
-                            material.roughness = 0.5; // Slightly rougher metal
-                            material.color.set(0x444444); // Dark gray color
+                            material.metalness = 0.9; 
+                            material.roughness = 0.5; 
+                            material.color.set(0x444444); 
                         }
                         
                         child.material.needsUpdate = true;
