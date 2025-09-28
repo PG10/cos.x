@@ -17,7 +17,7 @@
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
-        // *** ABSOLUTE PATH FIX for 404 errors ***
+        // *** FIX: Absolute Paths for all 404 assets ***
         const MODEL_PATH = '/cos.x/sink.glb';    
         const HDRI_PATH = '/cos.x/studio1.hdr';
 
@@ -46,7 +46,7 @@
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             pmremGenerator.compileEquirectangularShader();
 
-            // *** HDRI_PATH now uses absolute path /cos.x/studio1.hdr ***
+            // HDRI_PATH now uses absolute path /cos.x/studio1.hdr
             new THREE.RGBELoader()
                 .setDataType(THREE.FloatType)
                 .load(HDRI_PATH, function (texture) {
@@ -56,8 +56,8 @@
                     pmremGenerator.dispose();
                     loadModel();
                 }, undefined, function (error) {
-                    // This will confirm if the HDRI file loaded correctly
-                    console.error('HDRI Load Error:', error); 
+                    // Logs error if HDRI fails to load
+                    console.error('HDRI Load Error (Check path and file name):', error); 
                 });
 
             window.addEventListener('resize', onWindowResize, false);
@@ -65,20 +65,19 @@
         }
 
         function loadModel() {
-            // *** DRACO Path Fix ***
+            // DRACO Path Fix: Must use absolute path for the decoder files to be found.
             const dracoLoader = new THREE.DRACOLoader();
-            // Absolute path is essential for the decoder files to be found.
             dracoLoader.setDecoderPath('/cos.x/draco/'); 
 
             const loader = new THREE.GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
 
-            // *** MODEL_PATH now uses absolute path /cos.x/sink.glb ***
+            // MODEL_PATH now uses absolute path /cos.x/sink.glb
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 scene.add(model);
             }, undefined, function (error) {
-                console.error('GLB Load Error:', error);
+                console.error('GLB Load Error (Check path and file name):', error);
             });
         }
 
