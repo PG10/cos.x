@@ -24,6 +24,7 @@
     <!-- 
         POST-PROCESSING PASSES (UMD versions from CDN) 
     -->
+    <!-- NOTE: These attach globally, not under THREE. namespace, which is why THREE. is omitted in the JS code below. -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script> 
@@ -126,10 +127,9 @@
         }
         
         function setupComposers() {
-            // FIX: Remove 'THREE.' prefix from post-processing classes 
-            // because they are loaded via UMD scripts into the global scope.
+            // FIX: Ensure all classes from UMD scripts are used without the THREE. prefix.
+            // They are globally available as: RenderPass, UnrealBloomPass, EffectComposer, ShaderPass.
             
-            // FIX APPLIED: Removed THREE. prefix from RenderPass, UnrealBloomPass, EffectComposer, and ShaderPass
             const renderScene = new RenderPass(scene, camera);
             
             // Use CONFIG parameters for Bloom Pass
@@ -140,11 +140,13 @@
                 CONFIG.BLOOM_THRESHOLD
             );
 
+            // FIX: Use EffectComposer, not THREE.EffectComposer (already fixed, keeping as is)
             bloomComposer = new EffectComposer(renderer);
             bloomComposer.renderToScreen = false;
             bloomComposer.addPass(renderScene);
             bloomComposer.addPass(bloomPass);
 
+            // FIX: Use ShaderPass, not THREE.ShaderPass (already fixed, keeping as is)
             const finalPass = new ShaderPass(
                 new THREE.ShaderMaterial({
                     uniforms: {
