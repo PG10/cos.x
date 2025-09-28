@@ -30,6 +30,8 @@
         let scene, camera, renderer, controls;
         let models = {}; 
 
+        // *** REMOVED: sceneOffset variable ***
+
         function init() {
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -46,12 +48,172 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // *** CAMERA POSITION ADJUSTED: Moved closer for visibility ***
-            camera.position.set(0.0, 10.0, 10.0); 
+            // *** REVERTED: Original Camera Position ***
+            camera.position.set(0.0, 10.0, 100.0); 
             
             // Add Lights 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
             scene.add(ambientLight);
 
             const ledLight = new THREE.PointLight(0xffeebb, 1000, 500); 
-            ledLight.position.set(
+            // *** REVERTED: Original Light Position ***
+            ledLight.position.set(0, 5, 0); 
+            scene.add(ledLight);
+            
+            // OrbitControls Setup
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            // *** REVERTED: Original Controls Target ***
+            controls.target.set(0, 0, 0); 
+            controls.minDistance = 10.0;
+            controls.maxDistance = 200.0;
+            controls.enableDamping = true;
+            controls.update();
+            
+            loadAllModels(); 
+
+            window.addEventListener('resize', onWindowResize, false);
+            animate();
+        }
+
+        function loadAllModels() {
+            const dracoLoader = new THREE.DRACOLoader();
+            dracoLoader.setDecoderPath('/cos.x/draco/'); 
+            const gltfLoader = new THREE.GLTFLoader();
+            gltfLoader.setDRACOLoader(dracoLoader);
+
+            let modelsLoaded = 0;
+            const totalModels = 8;
+            const modelPaths = {
+                'sink': SINK_MODEL_PATH,
+                'shade': SHADE_MODEL_PATH,
+                'bands': BANDS_MODEL_PATH,
+                'feeds': FEEDS_MODEL_PATH,
+                'gripper': GRIPPER_MODEL_PATH,
+                'holder': HOLDER_MODEL_PATH,
+                'lens': LENS_MODEL_PATH,
+                'suspension': SUSPENSION_MODEL_PATH
+            };
+
+            const onModelLoaded = (gltf, modelName) => {
+                const loadedModel = gltf.scene;
+                
+                loadedModel.traverse((child) => {
+                    if (child.isMesh) {
+                        const material = child.material;
+                        
+                        // Reset properties
+                        material.transparent = false;
+                        material.opacity = 1.0;
+                        material.emissive.set(0x000000);
+                        material.emissiveIntensity = 0.0;
+                        material.needsUpdate = true;
+                        
+                        // --- MATERIAL CUSTOMIZATION (ALL COMPLETE) ---
+                        let metalness = 0.0;
+                        let roughness = 0.5;
+                        let color = 0xffffff;
+
+                        if (modelName === 'sink') {
+                            // ALUMINA HEATSINK
+                            metalness = 0.05; 
+                            roughness = 0.3; 
+                            color = 0xffffff; 
+                        } else if (modelName === 'shade') {
+                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE
+                            metalness = 0.05; 
+                            roughness = 0.9; 
+                            color = 0xffffff; 
+                            material.transparent = true;
+                            material.opacity = 0.7; 
+                        } else if (modelName === 'lens') {
+                            // WARM EMISSIVE LENS
+                            metalness = 0.1;
+                            roughness = 0.1;
+                            color = 0xffffff; 
+                            material.emissive.set(0xffeebb);
+                            material.emissiveIntensity = 1.5; 
+                        } else if (modelName === 'gripper') {
+                            // SATIN ALUMINUM METAL
+                            metalness = 0.9;
+                            roughness = 0.5;
+                            color = 0xc0c0c0;
+                        } else if (modelName === 'holder' || modelName === 'bands') {
+                            // MATTE PLASTIC WHITE 
+                            metalness = 0.0; 
+                            roughness = 0.8;
+                            color = 0xffffff; 
+                        } else if (modelName === 'suspension') {
+                            // DARKER GREY METAL WIRE CABLE
+                            metalness = 0.9;
+                            roughness = 0.2;
+                            color = 0x444444; 
+                        } else if (modelName === 'feeds') {
+                            // SLIGHTLY TRANSLUCENT DIFFUSE RUBBER (LIGHTER GRAY)
+                            metalness = 0.0;
+                            roughness = 0.8;
+                            color = 0x666666; 
+                            material.transparent = true;
+                            material.opacity = 0.9; 
+                        }
+
+                        material.metalness = metalness;
+                        material.roughness = roughness;
+                        material.color.set(color); 
+                        // --- END MATERIAL CUSTOMIZATION ---
+                    }
+                });
+
+                // Store model and apply positioning/scaling
+                models[modelName] = loadedModel;
+                
+                // *** KEEPING LARGE SCALE FOR VISIBILITY ***
+                const defaultScale = 100.0; 
+                
+                loadedModel.scale.set(defaultScale, defaultScale, defaultScale);
+                
+                // Apply positioning based on the large scale
+                if (modelName === 'shade') {
+                    loadedModel.position.set(0, -20.0 * defaultScale, 0); 
+                } else if (modelName === 'suspension') {
+                    loadedModel.position.set(0, 50.0 * defaultScale, 0);
+                } else {
+                    loadedModel.position.set(0, 0, 0); // All other components start at the origin (0,0,0)
+                }
+                
+                scene.add(loadedModel);
+                modelsLoaded++;
+
+                if (modelsLoaded === totalModels) {
+                    console.log("All 8 models loaded successfully!");
+                    console.log("ACTION REQUIRED: Adjust the position and scale for each model to assemble the fixture.");
+                }
+            };
+            
+            // Loop through all paths to load models
+            Object.keys(modelPaths).forEach(modelName => {
+                gltfLoader.load(modelPaths[modelName], 
+                    (gltf) => onModelLoaded(gltf, modelName), 
+                    undefined, 
+                    (error) => {
+                        console.error(`Error loading ${modelName}:`, error);
+                    }
+                );
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls && controls.enableDamping) controls.update(); 
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
