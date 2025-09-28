@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Fixture Model - Photorealistic White Studio</title>
+    <title>LED Fixture Model - Self-Illuminated Glow</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -63,28 +63,20 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Set exposure for photorealistic brightness
+            // Set exposure for bright scene and increased to compensate for removal of point/ambient lights
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.4; 
+            renderer.toneMappingExposure = 0.8; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            // Set background to light gray for subtle contrast
-            renderer.setClearColor(0xeeeeee); 
+            // Set background to pure white
+            renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
             // 2. Setup Scene and Camera
             scene = new THREE.Scene();
             
-            // 3. Lighting Setup (Studio Lighting Approach)
-            
-            // Main Fill Light (Bright Ambient) - provides overall softness
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
-            scene.add(ambientLight);
-
-            // Key Light (Subtle directional light to define shape and cast soft shadows)
-            const keyLight = new THREE.DirectionalLight(0xffeebb, 0.8);
-            keyLight.position.set(20, 30, 40); // Top-front angle
-            scene.add(keyLight);
+            // 3. Lighting Setup (Only HDR environment will be used)
+            // Removed: ambientLight, pointLight, fillLight
             
             // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
@@ -99,7 +91,7 @@
             // 4. Setup Composers (Bloom Effect)
             setupComposers();
 
-            // 5. Load Assets
+            // 5. Load Assets (This will also load the HDR environment now)
             loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
@@ -109,11 +101,12 @@
         function setupComposers() {
             const renderScene = new THREE.RenderPass(scene, camera);
             
+            // Bloom Pass: High strength and threshold to focus the glow only on the brightest parts
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.2,  // strength (increased to match high lens brightness)
+                2.0,  // strength (HIGH strength for dramatic glow)
                 0.3,  // radius 
-                0.85   // threshold 
+                0.9   // threshold (HIGH threshold so only the lens and bright shade glow)
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -141,8 +134,7 @@
                         void main() {
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
-                            // Combine base scene and bloom, reducing bloom factor slightly
-                            gl_FragColor = baseColor + (bloomColor * 0.8); 
+                            gl_FragColor = baseColor + (bloomColor * 0.9); 
                         }
                     `,
                     defines: {}
@@ -156,22 +148,24 @@
         }
 
         function loadHDRAndModels() {
-            // No HDR environment map needed for this studio setup (it complicates white-on-white)
-            loadAllModels();
-            /*
+            // Loading HDR texture to provide scene lighting/environment map
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
                     renderer.autoClear = false; 
-                    scene.environmentIntensity = 0.1; 
+                    // Setting environment intensity to provide main illumination
+                    scene.environmentIntensity = 1.0; 
                     loadAllModels();
                 },
                 undefined, 
-                (error) => console.error("Could not load 'env.hdr'. Proceeding without environment map.", error)
+                (error) => {
+                     console.error("FATAL ERROR: Could not load 'env.hdr'. Proceeding without environment map.", error);
+                     // Fallback in case HDR fails to load
+                     loadAllModels();
+                }
             );
-            */
         }
 
         function loadAllModels() {
@@ -198,7 +192,6 @@
                         
                         let material = child.material;
                         
-                        // Force MeshPhysicalMaterial for maximum control over PBR properties
                         if (!material.isMeshPhysicalMaterial) {
                             material = new THREE.MeshPhysicalMaterial().copy(material);
                             child.material = material;
@@ -208,39 +201,38 @@
                         material.emissive.set(0x000000); 
                         child.layers.set(ENTIRE_SCENE); 
                         
-                        // Define the base color for white parts (slight off-white)
-                        const CERAMIC_COLOR = 0xf5f5f5; 
+                        // Slightly off-white to ensure a subtle shadow against pure white background
+                        const CERAMIC_COLOR = 0xf2f2f2; 
 
                         if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: Matte Translucency with a hint of warm color
-                            material.transmission = 0.85; 
+                            // TRANSLUCENT SHADE: Diffuses the light beautifully
+                            material.transmission = 0.9; 
                             material.thickness = 1.0; 
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
-                            material.roughness = 0.95; 
+                            material.roughness = 0.9; 
                             material.metalness = 0.0;
-                            // Give the shade a soft, warm tint
+                            // Give the shade a soft, warm base color
                             material.color.set(0xfff8f0); 
                             
-                            // SHADE GLOW (Passive emission to enhance diffusion)
-                            material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.1; 
+                            // SHADE GLOW: Must rely on its own emissive property now
+                            material.emissive.set(0xfff8f0); 
+                            material.emissiveIntensity = 5.0; // Increased to create a visible glow
                             child.layers.enable(BLOOM_SCENE); 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The primary light source)
-                            material.metalness = 0.0; material.roughness = 0.0; // Minimal roughness
+                            // WARM EMISSIVE LENS: The main visual source of the light
+                            material.metalness = 0.0; material.roughness = 0.0;
                             material.color.set(0xffffff);
-                            material.emissive.set(0xffeebb); 
-                            // HIGH Emissive intensity for maximum bloom and light spill
-                            material.emissiveIntensity = 40.0; 
-                            child.layers.enable(BLOOM_SCENE); 
+                            material.emissive.set(0xffd8b0); 
+                            material.emissiveIntensity = 40.0; // Very high intensity for bloom
+                            child.layers.enable(BLOOM_SCENE); // Mark for bloom
 
                         } else if (isCeramicPart(modelName)) {
-                            // CERAMIC PARTS (Matte Off-White)
+                            // CERAMIC PARTS: Matte, off-white, and defined by the HDR map
                             material.metalness = 0.0; 
-                            material.roughness = 1.0; // Max roughness (pure matte)
-                            material.color.set(CERAMIC_COLOR); // Off-white for contrast
+                            material.roughness = 1.0; 
+                            material.color.set(CERAMIC_COLOR); 
                             
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
                             // METAL PARTS (Dark Gray Chrome)
@@ -250,7 +242,6 @@
                         }
                         
                         child.material.needsUpdate = true;
-                        // --- END MATERIAL CUSTOMIZATION ---
                     }
                 });
                 
