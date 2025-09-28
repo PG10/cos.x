@@ -35,9 +35,9 @@
         // --- SCENE CONFIGURATION PARAMETERS ---
         const CONFIG = {
             // RENDERER & ENVIRONMENT
-            TONE_MAPPING_EXPOSURE: 0.5,          // Overall scene brightness (1.0 is standard)
-            BACKGROUND_COLOR: 0xffffff,          // Canvas background color (pure white)
-            HDR_ENVIRONMENT_INTENSITY: 0.5,      // Strength of the loaded 'env.hdr' map
+            TONE_MAPPING_EXPOSURE: 1.0,          // Adjusted exposure for a balanced look (1.0 is standard)
+            BACKGROUND_COLOR: 0x111111,          // **KEY CHANGE: Dark background to create contrast for white objects**
+            HDR_ENVIRONMENT_INTENSITY: 0.7,      // Strength of the loaded 'env.hdr' map (slightly higher for ambient detail)
             
             // MATERIAL COLORS
             CERAMIC_COLOR: 0xe8e8e8,             // Base color for sink, holder, etc. (Slightly gray for contrast)
@@ -50,11 +50,11 @@
             SHADE_TRANSMISSION: 0.9,             // High transmission (translucent)
             
             // LIGHT EMISSION INTENSITIES
-            LENS_EMISSIVE_INTENSITY: 0.0,       // Intensity of the primary light source (very high for glow)
+            LENS_EMISSIVE_INTENSITY: 40.0,       // Light source is now on (40.0 is a moderate intensity)
             SHADE_EMISSIVE_INTENSITY: 0.0,       // Shade relies on the lens for illumination (0.0 means no self-emission)
             
             // POST-PROCESSING (UNREAL BLOOM)
-            BLOOM_STRENGTH: 6,                 // Intensity of the glow effect
+            BLOOM_STRENGTH: 5.0,                 // Increased bloom strength to emphasize the glow
             BLOOM_RADIUS: 0.5,                   // Spread of the glow effect
             BLOOM_THRESHOLD: 0.9                 // Only colors above this brightness will bloom
         };
