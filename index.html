@@ -18,6 +18,7 @@
 
     <script>
         // --- FILE PATHS (All 8 Components) ---
+        // These paths are correct because they reference files inside the /cos.x/ folder
         const BANDS_MODEL_PATH      = '/cos.x/bands.glb';
         const FEEDS_MODEL_PATH      = '/cos.x/feeds.glb';
         const GRIPPER_MODEL_PATH    = '/cos.x/gripper.glb';
@@ -69,23 +70,21 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - NOW LINKING TO 'env.hdr'
+            // Load the HDR Environment Map - PATH CORRECTED TO ROOT FOLDER
             new THREE.RGBELoader()
-                .setPath('/cos.x/')
-                .load('env.hdr', function (texture) { // <-- The path you requested: 'env.hdr'
+                .setPath('/') // <-- CORRECTED PATH: Looking in the root folder for 'env.hdr'
+                .load('env.hdr', function (texture) {
                     
                     texture.mapping = THREE.EquirectangularReflectionMapping;
 
-                    // Apply to scene environment (for PBR materials)
                     scene.environment = texture;
 
-                    console.log("HDR Environment Map 'env.hdr' loaded.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully from root path.");
 
-                    // After environment is set, load the models
                     loadAllModels();
                 },
                 (xhr) => console.log(((xhr.loaded / xhr.total) * 100).toFixed(0) + '% loaded HDR'),
-                (error) => console.error("Error loading 'env.hdr': Make sure 'env.hdr' is in the /cos.x/ folder.", error)
+                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Check file path and naming.", error)
             );
         }
 
@@ -105,8 +104,6 @@
                 'gripper': GRIPPER_MODEL_PATH,
                 'holder': HOLDER_MODEL_PATH,
                 'lens': LENS_MODEL_PATH,
-                'shade': SHADE_MODEL_PATH,
-                'sink': SINK_MODEL_PATH,    
                 'suspension': SUSPENSION_MODEL_PATH
             };
 
@@ -117,7 +114,6 @@
                     if (child.isMesh) {
                         const material = child.material;
                         
-                        // Reset properties
                         material.transparent = false;
                         material.opacity = 1.0;
                         material.emissive.set(0x000000);
@@ -140,7 +136,7 @@
                             // WARM EMISSIVE LENS (The only necessary light source remaining)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 3.5; // Increased emissive for a bright light source
+                            material.emissiveIntensity = 3.5; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -165,4 +161,44 @@
 
                 models[modelName] = loadedModel;
                 
-                // --- POSITIONING LOG
+                // --- POSITIONING LOGIC ---
+                const defaultScale = 1.0; 
+                loadedModel.position.set(0, 0, 0); 
+                loadedModel.scale.set(defaultScale, defaultScale, defaultScale);
+                
+                scene.add(loadedModel);
+                modelsLoaded++;
+
+                if (modelsLoaded === totalModels) {
+                    console.log("All 8 models loaded. Scene fully initialized with HDR lighting.");
+                }
+            };
+            
+            // Loop through all paths to load models
+            Object.keys(modelPaths).forEach(modelName => {
+                gltfLoader.load(modelPaths[modelName], 
+                    (gltf) => onModelLoaded(gltf, modelName), 
+                    undefined, 
+                    (error) => {
+                        console.error(`Error loading ${modelName}:`, error);
+                    }
+                );
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls && controls.enableDamping) controls.update(); 
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
