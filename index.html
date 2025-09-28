@@ -40,8 +40,8 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // *** FIX: Increase initial distance significantly (10.0) to start outside the model ***
-            const distance = 10.0; 
+            // *** FIX: Increase initial distance significantly (50.0) to start outside the model ***
+            const distance = 50.0; 
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
             // ORBITCONTROLS SETUP (Rotation, Pan, and Zoom)
@@ -49,75 +49,4 @@
             controls.target.set(0, 0, 0); 
             
             // Allows full zoom control (in and out)
-            controls.minDistance = 0.05; 
-            controls.maxDistance = 50.0; // Increased maxDistance for further zoom if needed
-
-            controls.enableDamping = true;
-            controls.update();
-            
-            // Load Environment Map (HDRI)
-            const pmremGenerator = new THREE.PMREMGenerator(renderer);
-            pmremGenerator.compileEquirectangularShader();
-
-            new THREE.RGBELoader()
-                .setDataType(THREE.FloatType)
-                .load(HDRI_PATH, function (texture) {
-                    const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-                    scene.environment = envMap; 
-                    texture.dispose();
-                    pmremGenerator.dispose();
-                    loadModel();
-                }, undefined, function (error) {
-                    console.error('HDRI Load Error:', error); 
-                });
-
-            window.addEventListener('resize', onWindowResize, false);
-            animate();
-        }
-
-        function loadModel() {
-            // DRACO Path Fix: Absolute path is essential for the decoder files.
-            const dracoLoader = new THREE.DRACOLoader();
-            dracoLoader.setDecoderPath('/cos.x/draco/'); 
-
-            const loader = new THREE.GLTFLoader();
-            loader.setDRACOLoader(dracoLoader);
-
-            loader.load(MODEL_PATH, function (gltf) {
-                model = gltf.scene;
-                
-                // REALISM FIX: Apply Material Properties to all meshes
-                model.traverse((child) => {
-                    if (child.isMesh) {
-                        const material = child.material;
-                        
-                        // Add subtle metallic and smoothness for a more realistic look
-                        material.metalness = 0.2; 
-                        material.roughness = 0.4;  
-                        material.needsUpdate = true;
-                    }
-                });
-                
-                scene.add(model);
-            }, undefined, function (error) {
-                console.error('GLB Load Error:', error);
-            });
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            // Update controls for smooth rotation/panning
-            if (controls && controls.enableDamping) controls.update(); 
-            renderer.render(scene, camera);
-        }
-
-        init();
-    </script>
-</body>
-</html>
+            controls.minDistance = 0.05;
