@@ -66,9 +66,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
-            // FIX 1: DRAMATICALLY reduce toneMappingExposure to darken the scene and stop the blowout.
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.5; // WAS 1.2 -> Adjust this down significantly
+            renderer.toneMappingExposure = 0.5; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
@@ -85,8 +84,7 @@
             controls.update();
 
             // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
-            // FIX 2: Reduce the spotlight intensity to prevent it from overwhelming the scene.
-            const spotLight = new THREE.SpotLight(0xfff0dd, 500, 100, Math.PI / 4, 0.5); // WAS 5000 -> Reduced to 500
+            const spotLight = new THREE.SpotLight(0xfff0dd, 500, 100, Math.PI / 4, 0.5); 
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
@@ -110,9 +108,9 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.0,  // strength
-                0.2,  // radius
-                0.01  // threshold (Only objects with high emissiveIntensity will glow)
+                1.0,  // strength (Controls glow spread)
+                0.2,  // radius (Controls glow radius)
+                0.5   // FIX: RAISED THRESHOLD (WAS 0.01) - This forces the brightest light source (lens, emissive 50) to be the main contributor to the bloom, reducing overall white saturation.
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -224,9 +222,7 @@
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // The emissive intensity is still high (50.0) to drive the bloom, 
-                            // but the lowered toneMappingExposure will control the final output.
-                            material.emissiveIntensity = 50.0; 
+                            material.emissiveIntensity = 50.0; // Extreme intensity for big bloom
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
