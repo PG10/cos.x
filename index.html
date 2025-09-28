@@ -31,6 +31,13 @@
         let models = {}; 
 
         function init() {
+            // --- EASY VIEW ADJUSTMENT VARIABLES ---
+            // Adjust these three values to control the initial view and zoom limits.
+            const INITIAL_CAMERA_Z = 50.0; // Distance of the camera from the center (0,0,0)
+            const MIN_ZOOM_DISTANCE = 1.0;  // Closest you can zoom in (e.g., 1.0)
+            const MAX_ZOOM_DISTANCE = 500.0; // Farthest you can zoom out
+            // --------------------------------------
+
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -46,8 +53,8 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // *** CAMERA CHANGE: Pull camera far back to escape the heatsink/models ***
-            camera.position.set(0.0, 10.0, 500.0); 
+            // Camera position set using the adjustable Z distance
+            camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
             
             // Add Lights 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
@@ -60,9 +67,9 @@
             // OrbitControls Setup
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
-            controls.minDistance = 1.0; 
-            // *** CONTROL CHANGE: Increase maxDistance to allow maximum zoom-out ***
-            controls.maxDistance = 5000.0; 
+            // Control limits set using the adjustable variables
+            controls.minDistance = MIN_ZOOM_DISTANCE; 
+            controls.maxDistance = MAX_ZOOM_DISTANCE; 
             controls.enableDamping = true;
             controls.update();
             
@@ -112,45 +119,28 @@
 
                         if (modelName === 'sink') {
                             // ALUMINA HEATSINK
-                            metalness = 0.05; 
-                            roughness = 0.3; 
-                            color = 0xffffff; 
+                            metalness = 0.05; roughness = 0.3; color = 0xffffff; 
                         } else if (modelName === 'shade') {
                             // DIFFUSE TRANSLUCENT PORCELAIN SHADE
-                            metalness = 0.05; 
-                            roughness = 0.9; 
-                            color = 0xffffff; 
-                            material.transparent = true;
-                            material.opacity = 0.7; 
+                            metalness = 0.05; roughness = 0.9; color = 0xffffff; 
+                            material.transparent = true; material.opacity = 0.7; 
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS
-                            metalness = 0.1;
-                            roughness = 0.1;
-                            color = 0xffffff; 
-                            material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 1.5; 
+                            metalness = 0.1; roughness = 0.1; color = 0xffffff; 
+                            material.emissive.set(0xffeebb); material.emissiveIntensity = 1.5; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
-                            metalness = 0.9;
-                            roughness = 0.5;
-                            color = 0xc0c0c0;
+                            metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
                         } else if (modelName === 'holder' || modelName === 'bands') {
                             // MATTE PLASTIC WHITE 
-                            metalness = 0.0; 
-                            roughness = 0.8;
-                            color = 0xffffff; 
+                            metalness = 0.0; roughness = 0.8; color = 0xffffff; 
                         } else if (modelName === 'suspension') {
                             // DARKER GREY METAL WIRE CABLE
-                            metalness = 0.9;
-                            roughness = 0.2;
-                            color = 0x444444; 
+                            metalness = 0.9; roughness = 0.2; color = 0x444444; 
                         } else if (modelName === 'feeds') {
                             // SLIGHTLY TRANSLUCENT DIFFUSE RUBBER (LIGHTER GRAY)
-                            metalness = 0.0;
-                            roughness = 0.8;
-                            color = 0x666666; 
-                            material.transparent = true;
-                            material.opacity = 0.9; 
+                            metalness = 0.0; roughness = 0.8; color = 0x666666; 
+                            material.transparent = true; material.opacity = 0.9; 
                         }
 
                         material.metalness = metalness;
@@ -160,28 +150,51 @@
                     }
                 });
 
-                // Store model and apply positioning/scaling
                 models[modelName] = loadedModel;
                 
-                // *** KEEPING LARGE SCALE FOR VISIBILITY ***
-                const defaultScale = 100.0; 
+                // --- POSITIONING LOGIC (READY FOR ASSEMBLY) ---
+                // *** SCALE IS NOW A SENSIBLE VALUE based on correct export ***
+                const defaultScale = 1.0; 
                 
+                // Since transforms were applied in Blender, the position is now 0,0,0 
+                // and the scale is 1.0, and they will load in correct relation to each other.
+                loadedModel.position.set(0, 0, 0); 
                 loadedModel.scale.set(defaultScale, defaultScale, defaultScale);
-                
-                // Apply positioning based on the large scale
-                // All X/Z positions are 0 for now to keep them centered
-                if (modelName === 'shade') {
-                    // Start shade at Y=0
-                    loadedModel.position.set(0, 0, 0); 
-                } else if (modelName === 'suspension') {
-                    // Position suspension well above the shade
-                    loadedModel.position.set(0, 20.0 * defaultScale, 0);
-                } else {
-                    // All other small components start at the origin (0,0,0)
-                    loadedModel.position.set(0, 0, 0); 
-                }
                 
                 scene.add(loadedModel);
                 modelsLoaded++;
 
-                if (modelsLoaded === total
+                if (modelsLoaded === totalModels) {
+                    console.log("All 8 models loaded successfully at the correct scale!");
+                    console.log("Next: Adjust the INITIAL_CAMERA_Z value at the top of the 'init()' function to get the perfect starting view.");
+                }
+            };
+            
+            // Loop through all paths to load models
+            Object.keys(modelPaths).forEach(modelName => {
+                gltfLoader.load(modelPaths[modelName], 
+                    (gltf) => onModelLoaded(gltf, modelName), 
+                    undefined, 
+                    (error) => {
+                        console.error(`Error loading ${modelName}:`, error);
+                    }
+                );
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls && controls.enableDamping) controls.update(); 
+            renderer.render(scene, camera);
+        }
+
+        init();
+    </script>
+</body>
+</html>
