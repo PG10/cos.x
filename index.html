@@ -18,7 +18,7 @@
 
     <script>
         // --- FILE PATHS (All 8 Components) ---
-        // These paths are correct because they reference files inside the /cos.x/ folder
+        // These paths are correct for files inside the /cos.x/ folder
         const BANDS_MODEL_PATH      = '/cos.x/bands.glb';
         const FEEDS_MODEL_PATH      = '/cos.x/feeds.glb';
         const GRIPPER_MODEL_PATH    = '/cos.x/gripper.glb';
@@ -70,21 +70,21 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - PATH CORRECTED TO ROOT FOLDER
+            // Load the HDR Environment Map - PATH CORRECTED TO RELATIVE PATH (./)
             new THREE.RGBELoader()
-                .setPath('/') // <-- CORRECTED PATH: Looking in the root folder for 'env.hdr'
+                .setPath('./') // <-- CORRECTED PATH: Should resolve the 404 error by looking in the current folder.
                 .load('env.hdr', function (texture) {
                     
                     texture.mapping = THREE.EquirectangularReflectionMapping;
 
                     scene.environment = texture;
 
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully from root path.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully from current folder.");
 
                     loadAllModels();
                 },
                 (xhr) => console.log(((xhr.loaded / xhr.total) * 100).toFixed(0) + '% loaded HDR'),
-                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Check file path and naming.", error)
+                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Please check your local server's root path.", error)
             );
         }
 
@@ -133,7 +133,7 @@
                             metalness = 0.05; roughness = 0.9; color = 0xffffff; 
                             material.transparent = true; material.opacity = 0.7; 
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The only necessary light source remaining)
+                            // WARM EMISSIVE LENS
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
                             material.emissiveIntensity = 3.5; 
