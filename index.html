@@ -17,20 +17,21 @@
     <script src="./js/OrbitControls.js"></script>
 
     <script>
-        // --- FILE PATHS (Using the confirmed working absolute paths) ---
+        // --- FILE PATHS (Using the confirmed working ABSOLUTE paths for GitHub Pages) ---
         const MODEL_PATH = '/cos.x/sink.glb';    
-        // *** HDRI_PATH updated to the final name to avoid the 404 ***
+        // Must match the renamed file for the 404 fix.
         const HDRI_PATH = '/cos.x/env.hdr'; 
 
-        let scene, camera, renderer, model, controls; // 'controls' is back!
+        let scene, camera, renderer, model, controls; 
 
         function init() {
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
+            // *** REALISM FIX: Lower exposure for better contrast and HDRI shadow definition ***
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.0; 
+            renderer.toneMappingExposure = 0.5; // Changed from 1.0 to 0.5
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xcccccc);
             document.body.appendChild(renderer.domElement);
@@ -42,9 +43,14 @@
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // *** RE-INITIALIZE ORBITCONTROLS ***
+            // *** ORBITCONTROLS SETUP (Rotation and Zoom) ***
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
+            
+            // Allows full zoom control
+            controls.minDistance = 0.05; 
+            controls.maxDistance = 5.0; 
+
             controls.enableDamping = true;
             controls.update();
             
@@ -61,7 +67,7 @@
                     pmremGenerator.dispose();
                     loadModel();
                 }, undefined, function (error) {
-                    console.error('HDRI Load Error (Check path and file name):', error); 
+                    console.error('HDRI Load Error:', error); 
                 });
 
             window.addEventListener('resize', onWindowResize, false);
@@ -69,7 +75,7 @@
         }
 
         function loadModel() {
-            // DRACO Path Fix: Absolute path is essential.
+            // DRACO Path Fix: Absolute path is essential for the decoder files.
             const dracoLoader = new THREE.DRACOLoader();
             dracoLoader.setDecoderPath('/cos.x/draco/'); 
 
@@ -78,9 +84,22 @@
 
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
+                
+                // *** REALISM FIX: Apply Material Properties to all meshes ***
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        const material = child.material;
+                        
+                        // Add subtle metallic and smoothness for a more realistic sink look
+                        material.metalness = 0.2; 
+                        material.roughness = 0.4;  
+                        material.needsUpdate = true;
+                    }
+                });
+                
                 scene.add(model);
             }, undefined, function (error) {
-                console.error('GLB Load Error (Check path and file name):', error);
+                console.error('GLB Load Error:', error);
             });
         }
 
@@ -92,7 +111,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            // *** RE-ADD CONTROLS UPDATE ***
+            // Update controls for smooth rotation/panning
             if (controls && controls.enableDamping) controls.update(); 
             renderer.render(scene, camera);
         }
