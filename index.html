@@ -66,8 +66,9 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
+            // FIX 1: DRAMATICALLY reduce toneMappingExposure to darken the scene and stop the blowout.
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 1.2; 
+            renderer.toneMappingExposure = 0.5; // WAS 1.2 -> Adjust this down significantly
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
@@ -84,7 +85,8 @@
             controls.update();
 
             // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
-            const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
+            // FIX 2: Reduce the spotlight intensity to prevent it from overwhelming the scene.
+            const spotLight = new THREE.SpotLight(0xfff0dd, 500, 100, Math.PI / 4, 0.5); // WAS 5000 -> Reduced to 500
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
@@ -222,7 +224,9 @@
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 50.0; // Extreme intensity for big bloom
+                            // The emissive intensity is still high (50.0) to drive the bloom, 
+                            // but the lowered toneMappingExposure will control the final output.
+                            material.emissiveIntensity = 50.0; 
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
