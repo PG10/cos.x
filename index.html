@@ -35,9 +35,9 @@
         // --- SCENE CONFIGURATION PARAMETERS ---
         const CONFIG = {
             // RENDERER & ENVIRONMENT
-            TONE_MAPPING_EXPOSURE: 1.2,          // Overall scene brightness (1.0 is standard)
+            TONE_MAPPING_EXPOSURE: 0.5,          // Overall scene brightness (1.0 is standard)
             BACKGROUND_COLOR: 0xffffff,          // Canvas background color (pure white)
-            HDR_ENVIRONMENT_INTENSITY: 1.0,      // Strength of the loaded 'env.hdr' map
+            HDR_ENVIRONMENT_INTENSITY: 0.5,      // Strength of the loaded 'env.hdr' map
             
             // MATERIAL COLORS
             CERAMIC_COLOR: 0xe8e8e8,             // Base color for sink, holder, etc. (Slightly gray for contrast)
@@ -50,7 +50,7 @@
             SHADE_TRANSMISSION: 0.9,             // High transmission (translucent)
             
             // LIGHT EMISSION INTENSITIES
-            LENS_EMISSIVE_INTENSITY: 2.0,       // Intensity of the primary light source (very high for glow)
+            LENS_EMISSIVE_INTENSITY: 0.0,       // Intensity of the primary light source (very high for glow)
             SHADE_EMISSIVE_INTENSITY: 0.0,       // Shade relies on the lens for illumination (0.0 means no self-emission)
             
             // POST-PROCESSING (UNREAL BLOOM)
