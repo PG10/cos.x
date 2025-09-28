@@ -223,7 +223,7 @@
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
                             // FIX: Increased shade emissive intensity
-                            material.emissiveIntensity = 5.0; // WAS 1.0, now 5.0
+                            material.emissiveIntensity = 1.0; // WAS 1.0, now 5.0
                             child.layers.enable(BLOOM_SCENE); // Glows
                             
                         } else if (modelName === 'lens') {
@@ -231,7 +231,7 @@
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
                             // FIX: Significantly increased lens emissive intensity
-                            material.emissiveIntensity = 20.0; // WAS 2.0, now 20.0
+                            material.emissiveIntensity = 1.0; // WAS 2.0, now 20.0
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
