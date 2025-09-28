@@ -41,12 +41,13 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; 
-            // Exposure boosted to ensure bright whites
-            renderer.toneMappingExposure = 2.0; 
+            // Set to Cineon for AGX-like softer highlight rolloff
+            renderer.toneMapping = THREE.CineonToneMapping; 
+            renderer.toneMappingExposure = 1.2; // Optimized exposure for Cineon
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            renderer.setClearColor(0x000000); 
+            // White background to match desired product presentation
+            renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
             // Setup Scene and Camera
@@ -63,12 +64,6 @@
             controls.enableDamping = true;
             controls.update();
 
-            // *** FIX: ADD REAL POINT LIGHT FOR PHYSICAL ILLUMINATION ***
-            const pointLight = new THREE.PointLight(0xffeebb, 100, 100);
-            pointLight.position.set(0, 0, 0); // Positioned inside the shade (at the center of the scene)
-            scene.add(pointLight);
-            // -----------------------------------------------------------
-
             loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
@@ -76,7 +71,7 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - Using the correct relative path './'
+            // Load the HDR Environment Map - Assuming a Neutral Studio HDR
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
@@ -84,7 +79,7 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
 
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully. Assuming Neutral Studio HDR.");
 
                     loadAllModels();
                 },
@@ -131,7 +126,7 @@
                             child.material = material;
                         }
 
-                        // --- MATERIAL CUSTOMIZATION ---
+                        // --- FINAL TUNED MATERIAL CUSTOMIZATION ---
                         let metalness = 0.0;
                         let roughness = 0.5;
                         let color = 0xffffff;
@@ -150,13 +145,13 @@
                             
                             // SHADE GLOW SIMULATION
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.5; 
+                            material.emissiveIntensity = 0.5; // High simulated glow
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (The visual light source)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 15.0; 
+                            material.emissiveIntensity = 15.0; // High intensity light source
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -193,7 +188,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Point Light and Exposure fix applied. Final render attempt.");
+                    console.log("Cineon Tone Mapping and final materials tuned for studio look. Ready for final check.");
                 }
             };
             
