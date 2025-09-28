@@ -14,14 +14,15 @@
     <script src="./js/GLTFLoader.js"></script>
     <script src="./js/RGBELoader.js"></script>
     <script src="./js/DRACOLoader.js"></script>
+    <script src="./js/OrbitControls.js"></script>
 
     <script>
-        // --- FILE PATHS (Pulls from your repository root) ---
-        // *** FIX: Absolute Paths for all 404 assets ***
+        // --- FILE PATHS (Using the confirmed working absolute paths) ---
         const MODEL_PATH = '/cos.x/sink.glb';    
-        const HDRI_PATH = '/cos.x/studio1.hdr';
+        // *** HDRI_PATH updated to the final name to avoid the 404 ***
+        const HDRI_PATH = '/cos.x/env.hdr'; 
 
-        let scene, camera, renderer, model;
+        let scene, camera, renderer, model, controls; // 'controls' is back!
 
         function init() {
             // Setup Renderer
@@ -38,15 +39,19 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // Fixed camera position
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
+            
+            // *** RE-INITIALIZE ORBITCONTROLS ***
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0); 
+            controls.enableDamping = true;
+            controls.update();
             
             // Load Environment Map (HDRI)
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             pmremGenerator.compileEquirectangularShader();
 
-            // HDRI_PATH now uses absolute path /cos.x/studio1.hdr
             new THREE.RGBELoader()
                 .setDataType(THREE.FloatType)
                 .load(HDRI_PATH, function (texture) {
@@ -56,7 +61,6 @@
                     pmremGenerator.dispose();
                     loadModel();
                 }, undefined, function (error) {
-                    // Logs error if HDRI fails to load
                     console.error('HDRI Load Error (Check path and file name):', error); 
                 });
 
@@ -65,14 +69,13 @@
         }
 
         function loadModel() {
-            // DRACO Path Fix: Must use absolute path for the decoder files to be found.
+            // DRACO Path Fix: Absolute path is essential.
             const dracoLoader = new THREE.DRACOLoader();
             dracoLoader.setDecoderPath('/cos.x/draco/'); 
 
             const loader = new THREE.GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
 
-            // MODEL_PATH now uses absolute path /cos.x/sink.glb
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 scene.add(model);
@@ -89,6 +92,8 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            // *** RE-ADD CONTROLS UPDATE ***
+            if (controls && controls.enableDamping) controls.update(); 
             renderer.render(scene, camera);
         }
 
