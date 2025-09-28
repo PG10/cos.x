@@ -129,6 +129,7 @@
             // FIX: Remove 'THREE.' prefix from post-processing classes 
             // because they are loaded via UMD scripts into the global scope.
             
+            // FIX APPLIED: Removed THREE. prefix from RenderPass, UnrealBloomPass, EffectComposer, and ShaderPass
             const renderScene = new RenderPass(scene, camera);
             
             // Use CONFIG parameters for Bloom Pass
