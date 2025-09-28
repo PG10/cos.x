@@ -1,333 +1,239 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>LED Fixture Model - Self-Illuminated Glow</title>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { margin: 0; overflow: hidden; background: #111; }
-        canvas { display: block; }
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            z-index: 1000;
-        }
-        #controls {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.7);
-            padding: 15px;
-            border-radius: 8px;
-            color: white;
-            font-size: 14px;
-            z-index: 1000;
-        }
-        #controls label {
-            display: block;
-            margin: 5px 0;
-        }
-        #controls input[type="range"] {
-            width: 150px;
-            margin-left: 10px;
-        }
-    </style>
-</head>
-<body>
-    <div id="loading">Loading LED Fixture...</div>
-    <div id="controls" style="display: none;">
-        <label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="10" step="0.1" value="1.2"></label>
-        <label>Emission Power: <input type="range" id="emissionIntensity" min="0" max="50" step="1" value="10"></label>
-        <label>Exposure: <input type="range" id="exposure" min="0" max="3" step="0.1" value="1.2"></label>
-    </div>
+<script type="module">
+import * as THREE from './js/three.module.js';
+import { OrbitControls } from './js/addons/controls/OrbitControls.js';
+import { GLTFLoader } from './js/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from './js/addons/loaders/DRACOLoader.js';
+import { RGBELoader } from './js/addons/loaders/RGBELoader.js';
+import { EffectComposer } from './js/addons/EffectComposer.js';
+import { RenderPass } from './js/addons/RenderPass.js';
+import { UnrealBloomPass } from './js/addons/UnrealBloomPass.js';
 
-    <script type="module">
-        import * as THREE from './js/three.module.js';
-        import { OrbitControls } from './js/addons/controls/OrbitControls.js';
-        import { GLTFLoader } from './js/addons/loaders/GLTFLoader.js';
-        import { DRACOLoader } from './js/addons/loaders/DRACOLoader.js';
-        import { RGBELoader } from './js/addons/loaders/RGBELoader.js';
-        import { EffectComposer } from './js/addons/EffectComposer.js';
-        import { RenderPass } from './js/addons/RenderPass.js';
-        import { UnrealBloomPass } from './js/addons/UnrealBloomPass.js';
+// --- SCENE CONFIG ---
+const CONFIG = {
+    TONE_MAPPING_EXPOSURE: 1.2,
+    BACKGROUND_COLOR: 0x111111,
+    HDR_ENVIRONMENT_INTENSITY: 0.7,
+    CERAMIC_COLOR: 0xe8e8e8,
+    METAL_COLOR: 0x444444,
+    LENS_EMISSIVE_COLOR: 0xfff2e0,
+    SHADE_BASE_COLOR: 0xffffff,
+    CERAMIC_ROUGHNESS: 0.9,
+    SHADE_TRANSMISSION: 0.9,
+    LENS_EMISSIVE_INTENSITY: 10.0,
+    SHADE_EMISSIVE_INTENSITY: 0.05,
+    BLOOM_STRENGTH: 1.2,
+    BLOOM_RADIUS: 0.6,
+    BLOOM_THRESHOLD: 0.8
+};
 
-        // Update loading status
-        document.getElementById('loading').textContent = 'Initializing LED Fixture...';
+// --- MODEL PATHS ---
+const modelPaths = {
+    'sink': './sink.glb',
+    'shade': './shade.glb',
+    'bands': './bands.glb',
+    'feeds': './feeds.glb',
+    'gripper': './gripper.glb',
+    'holder': './holder.glb',
+    'lens': './lens.glb',
+    'suspension': './suspension.glb'
+};
 
-        // --- SCENE CONFIGURATION PARAMETERS ---
-        const CONFIG = {
-            TONE_MAPPING_EXPOSURE: 1.2,          
-            BACKGROUND_COLOR: 0x111111,          
-            HDR_ENVIRONMENT_INTENSITY: 0.7,      
-            
-            // MATERIAL COLORS
-            CERAMIC_COLOR: 0xe8e8e8,             
-            METAL_COLOR: 0x444444,               
-            LENS_EMISSIVE_COLOR: 0xfff2e0,       
-            SHADE_BASE_COLOR: 0xffffff,          
-            
-            // MATERIAL PROPERTIES
-            CERAMIC_ROUGHNESS: 0.9,              
-            SHADE_TRANSMISSION: 0.9,             
-            
-            // LIGHT EMISSION INTENSITIES
-            LENS_EMISSIVE_INTENSITY: 10.0,       
-            SHADE_EMISSIVE_INTENSITY: 0.05,       
-            
-            // BLOOM SETTINGS
-            BLOOM_STRENGTH: 1.2,                 
-            BLOOM_RADIUS: 0.6,                   
-            BLOOM_THRESHOLD: 0.8                 
-        };
+let scene, camera, renderer, controls, composer;
+let lensObjects = [], shadeObjects = [];
+let modelsLoaded = 0, totalModels = Object.keys(modelPaths).length;
+let bloomPass;
 
-        // --- FILE PATHS (Your original GLB models without .glb extension) ---
-        const modelPaths = {
-            'sink': './sink',
-            'shade': './shade', 
-            'bands': './bands',
-            'feeds': './feeds',
-            'gripper': './gripper',
-            'holder': './holder',
-            'lens': './lens',
-            'suspension': './suspension'
-        };
-        
-        let scene, camera, renderer, controls, composer;
-        let lensObjects = [];
-        let shadeObjects = [];
-        let modelsLoaded = 0;
-        const totalModels = Object.keys(modelPaths).length;
-        
-        function init() {
-            console.log('Initializing LED Fixture...');
-            
-            // --- Renderer ---
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = CONFIG.TONE_MAPPING_EXPOSURE;
-            renderer.outputEncoding = THREE.sRGBEncoding;
-            document.body.appendChild(renderer.domElement);
+// --- INIT FUNCTION ---
+function init() {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = CONFIG.TONE_MAPPING_EXPOSURE;
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
 
-            // --- Scene ---
-            scene = new THREE.Scene();
-            
-            // --- Camera ---
-            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
-            camera.position.set(0, 1.5, 3);
-            
-            // --- Controls ---
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            
-            // --- Environment map ---
-            const rgbeLoader = new RGBELoader();
-            rgbeLoader.setPath('./');
-            rgbeLoader.load('env.hdr', (texture) => {
-                texture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.environment = texture;
-                console.log('HDR environment loaded successfully');
-            }, undefined, (error) => {
-                console.warn('Could not load HDR environment:', error);
-            });
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 1.5, 3);
 
-            // --- Bloom setup ---
-            composer = new EffectComposer(renderer);
-            const renderPass = new RenderPass(scene, camera);
-            composer.addPass(renderPass);
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.autoRotate = true;
 
-            const bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                CONFIG.BLOOM_STRENGTH, // strength
-                CONFIG.BLOOM_RADIUS,   // radius
-                CONFIG.BLOOM_THRESHOLD // threshold
-            );
-            composer.addPass(bloomPass);
-            
-            // Load all models
-            loadAllModels();
-            
-            // Setup UI controls
-            setupUIControls();
+    // HDR Environment
+    new RGBELoader().setPath('./').load('env.hdr', (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = texture;
+    });
 
-            window.addEventListener('resize', onWindowResize, false);
-            animate();
-            
-            // Show controls
-            document.getElementById('controls').style.display = 'block';
-        }
+    // Bloom composer
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        CONFIG.BLOOM_STRENGTH,
+        CONFIG.BLOOM_RADIUS,
+        CONFIG.BLOOM_THRESHOLD
+    );
+    composer.addPass(bloomPass);
 
-        function loadAllModels() {
-            const dracoLoader = new DRACOLoader();
-            dracoLoader.setDecoderPath('./draco/');
-            
-            const loader = new GLTFLoader();
-            loader.setDRACOLoader(dracoLoader);
+    loadAllModels();
+    setupUIControls();
+    window.addEventListener('resize', onWindowResize, false);
+    animate();
+    document.getElementById('controls').style.display = 'block';
+}
 
-            // Helper to load with custom materials
-            function loadPart(path, modelName, onMesh) {
-                loader.load(path, (gltf) => {
-                    console.log(`Loading model: ${modelName}`);
-                    const obj = gltf.scene;
-                    obj.traverse((child) => {
-                        if (child.isMesh) {
-                            onMesh(child);
-                        }
-                    });
-                    scene.add(obj);
-                    
-                    // Update loading progress
-                    modelsLoaded++;
-                    document.getElementById('loading').textContent = `Loading models... ${modelsLoaded}/${totalModels}`;
-                    
-                    if (modelsLoaded === totalModels) {
-                        document.getElementById('loading').style.display = 'none';
-                        console.log('All models loaded successfully');
-                        
-                        // Add point light inside lens area
-                        const bulbLight = new THREE.PointLight(0xffd8b0, 50, 100);
-                        bulbLight.position.set(0, -0.5, 0);
-                        scene.add(bulbLight);
-                    }
-                }, undefined, (error) => {
-                    console.error(`Error loading ${modelName}:`, error);
-                    modelsLoaded++;
-                    if (modelsLoaded === totalModels) {
-                        document.getElementById('loading').style.display = 'none';
-                    }
-                });
+// --- LOAD MODELS ---
+function loadAllModels() {
+    const dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('./draco/');
+    const loader = new GLTFLoader();
+    loader.setDRACOLoader(dracoLoader);
+
+    function loadPart(path, modelName, onMesh) {
+        loader.load(path, (gltf) => {
+            const obj = gltf.scene;
+            obj.traverse((child) => { if (child.isMesh) onMesh(child); });
+            scene.add(obj);
+            modelsLoaded++;
+            document.getElementById('loading').textContent = `Loading models... ${modelsLoaded}/${totalModels}`;
+            if (modelsLoaded === totalModels) {
+                document.getElementById('loading').style.display = 'none';
+                const bulbLight = new THREE.PointLight(0xffd8b0, 50, 100);
+                bulbLight.position.set(0, -0.5, 0);
+                scene.add(bulbLight);
             }
+        }, undefined, () => { modelsLoaded++; });
+    }
 
-            // Shade (translucent ceramic glow)
-            loadPart('./shade', 'shade', (mesh) => {
-                mesh.material = new THREE.MeshPhysicalMaterial({
-                    color: CONFIG.SHADE_BASE_COLOR,
-                    roughness: CONFIG.CERAMIC_ROUGHNESS,
-                    metalness: 0.0,
-                    transmission: CONFIG.SHADE_TRANSMISSION,
-                    thickness: 2.0,
-                    emissive: new THREE.Color(0xffd8b0),
-                    emissiveIntensity: CONFIG.SHADE_EMISSIVE_INTENSITY,
-                });
-                shadeObjects.push(mesh);
-            });
+    // Shade
+    loadPart(modelPaths.shade, 'shade', mesh => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+            color: CONFIG.SHADE_BASE_COLOR,
+            roughness: CONFIG.CERAMIC_ROUGHNESS,
+            metalness: 0,
+            transmission: CONFIG.SHADE_TRANSMISSION,
+            thickness: 2,
+            emissive: new THREE.Color(0xffd8b0),
+            emissiveIntensity: CONFIG.SHADE_EMISSIVE_INTENSITY,
+        });
+        shadeObjects.push(mesh);
+    });
 
-            // Lens (bright emissive)
-            loadPart('./lens', 'lens', (mesh) => {
-                mesh.material = new THREE.MeshPhysicalMaterial({
-                    color: 0xffffff,
-                    roughness: 0.3,
-                    emissive: new THREE.Color(CONFIG.LENS_EMISSIVE_COLOR),
-                    emissiveIntensity: CONFIG.LENS_EMISSIVE_INTENSITY,
-                });
-                lensObjects.push(mesh);
-            });
+    // Lens
+    loadPart(modelPaths.lens, 'lens', mesh => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+            color: 0xffffff,
+            roughness: 0.3,
+            emissive: new THREE.Color(CONFIG.LENS_EMISSIVE_COLOR),
+            emissiveIntensity: CONFIG.LENS_EMISSIVE_INTENSITY,
+        });
+        lensObjects.push(mesh);
+    });
 
-            // Holder (metallic ceramic)
-            loadPart('./holder', 'holder', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: CONFIG.CERAMIC_COLOR,
-                    roughness: CONFIG.CERAMIC_ROUGHNESS,
-                    metalness: 0.0,
-                });
-            });
+    // Holder
+    loadPart(modelPaths.holder, 'holder', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: CONFIG.CERAMIC_COLOR,
+            roughness: CONFIG.CERAMIC_ROUGHNESS,
+            metalness: 0.0,
+        });
+    });
 
-            // Bands (ceramic accents)
-            loadPart('./bands', 'bands', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: CONFIG.CERAMIC_COLOR,
-                    roughness: CONFIG.CERAMIC_ROUGHNESS,
-                    metalness: 0.1,
-                });
-            });
+    // Bands
+    loadPart(modelPaths.bands, 'bands', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: CONFIG.CERAMIC_COLOR,
+            roughness: CONFIG.CERAMIC_ROUGHNESS,
+            metalness: 0.1,
+        });
+    });
 
-            // Feeds (ceramic housing)
-            loadPart('./feeds', 'feeds', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: CONFIG.CERAMIC_COLOR,
-                    roughness: CONFIG.CERAMIC_ROUGHNESS,
-                    metalness: 0.0,
-                });
-            });
+    // Feeds
+    loadPart(modelPaths.feeds, 'feeds', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: CONFIG.CERAMIC_COLOR,
+            roughness: CONFIG.CERAMIC_ROUGHNESS,
+            metalness: 0.0,
+        });
+    });
 
-            // Gripper (metal hardware)
-            loadPart('./gripper', 'gripper', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: CONFIG.METAL_COLOR,
-                    roughness: 0.4,
-                    metalness: 1.0,
-                });
-            });
+    // Gripper
+    loadPart(modelPaths.gripper, 'gripper', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: CONFIG.METAL_COLOR,
+            roughness: 0.4,
+            metalness: 1.0,
+        });
+    });
 
-            // Suspension (cord/pipe)
-            loadPart('./suspension', 'suspension', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: 0x222222,
-                    roughness: 0.7,
-                    metalness: 0.3,
-                });
-            });
+    // Suspension
+    loadPart(modelPaths.suspension, 'suspension', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: 0x222222,
+            roughness: 0.7,
+            metalness: 0.3,
+        });
+    });
 
-            // Sink (ceiling mount)
-            loadPart('./sink', 'sink', (mesh) => {
-                mesh.material = new THREE.MeshStandardMaterial({
-                    color: CONFIG.METAL_COLOR,
-                    roughness: 0.6,
-                    metalness: 0.8,
-                });
-            });
-        }
-        
-        function setupUIControls() {
-            const bloomSlider = document.getElementById('bloomStrength');
-            const emissionSlider = document.getElementById('emissionIntensity');
-            const exposureSlider = document.getElementById('exposure');
-            
-            bloomSlider.addEventListener('input', (e) => {
-                CONFIG.BLOOM_STRENGTH = parseFloat(e.target.value);
-                if (composer && composer.passes[1]) {
-                    composer.passes[1].strength = CONFIG.BLOOM_STRENGTH;
-                }
-            });
-            
-            emissionSlider.addEventListener('input', (e) => {
-                CONFIG.LENS_EMISSIVE_INTENSITY = parseFloat(e.target.value);
-                lensObjects.forEach(lens => {
-                    lens.material.emissiveIntensity = CONFIG.LENS_EMISSIVE_INTENSITY;
-                });
-            });
-            
-            exposureSlider.addEventListener('input', (e) => {
-                renderer.toneMappingExposure = parseFloat(e.target.value);
-            });
-        }
+    // Sink
+    loadPart(modelPaths.sink, 'sink', mesh => {
+        mesh.material = new THREE.MeshStandardMaterial({
+            color: CONFIG.METAL_COLOR,
+            roughness: 0.6,
+            metalness: 0.8,
+        });
+    });
+}
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            if (composer) {
-                composer.setSize(window.innerWidth, window.innerHeight);
-            }
-        }
+// --- UI CONTROLS ---
+function setupUIControls() {
+    const bloomSlider = document.getElementById('bloomStrength');
+    const emissionSlider = document.getElementById('emissionIntensity');
+    const exposureSlider = document.getElementById('exposure');
 
-        function animate() {
-            requestAnimationFrame(animate);
-            if (controls) controls.update();
-            if (composer) {
-                composer.render();
-            } else {
-                renderer.render(scene, camera);
-            }
-        }
+    bloomSlider.addEventListener('input', e => {
+        CONFIG.BLOOM_STRENGTH = parseFloat(e.target.value);
+        bloomPass.strength = CONFIG.BLOOM_STRENGTH;
+    });
 
-        // Start initialization
-        init();
+    emissionSlider.addEventListener('input', e => {
+        let intensity = parseFloat(e.target.value);
+        lensObjects.forEach(mesh => mesh.material.emissiveIntensity = intensity);
+        shadeObjects.forEach(mesh => mesh.material.emissiveIntensity = intensity * 0.05);
+    });
 
-    </script>
-</body>
-</html>
+    exposureSlider.addEventListener('input', e => {
+        renderer.toneMappingExposure = parseFloat(e.target.value);
+    });
+}
+
+// --- WINDOW RESIZE ---
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// --- ANIMATION LOOP ---
+let clock = new THREE.Clock();
+function animate() {
+    requestAnimationFrame(animate);
+    let delta = clock.getElapsedTime();
+    
+    // Optional pulsing glow
+    let pulse = 0.5 + Math.sin(delta * 2) * 0.5;
+    lensObjects.forEach(mesh => mesh.material.emissiveIntensity = CONFIG.LENS_EMISSIVE_INTENSITY * pulse);
+    shadeObjects.forEach(mesh => mesh.material.emissiveIntensity = CONFIG.SHADE_EMISSIVE_INTENSITY * pulse);
+
+    if (controls) controls.update();
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
+}
+
+// --- START ---
+init();
+</script>
