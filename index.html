@@ -21,7 +21,9 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     
-    <!-- POST-PROCESSING PASSES (UMD versions from CDN) -->
+    <!-- 
+        POST-PROCESSING PASSES (UMD versions from CDN) 
+    -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script> 
@@ -124,22 +126,25 @@
         }
         
         function setupComposers() {
-            const renderScene = new THREE.RenderPass(scene, camera);
+            // FIX: Remove 'THREE.' prefix from post-processing classes 
+            // because they are loaded via UMD scripts into the global scope.
+            
+            const renderScene = new RenderPass(scene, camera);
             
             // Use CONFIG parameters for Bloom Pass
-            const bloomPass = new THREE.UnrealBloomPass(
+            const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
                 CONFIG.BLOOM_STRENGTH, 
                 CONFIG.BLOOM_RADIUS, 
                 CONFIG.BLOOM_THRESHOLD
             );
 
-            bloomComposer = new THREE.EffectComposer(renderer);
+            bloomComposer = new EffectComposer(renderer);
             bloomComposer.renderToScreen = false;
             bloomComposer.addPass(renderScene);
             bloomComposer.addPass(bloomPass);
 
-            const finalPass = new THREE.ShaderPass(
+            const finalPass = new ShaderPass(
                 new THREE.ShaderMaterial({
                     uniforms: {
                         baseTexture: { value: null },
@@ -167,7 +172,7 @@
             );
             finalPass.needsSwap = true;
 
-            finalComposer = new THREE.EffectComposer(renderer);
+            finalComposer = new EffectComposer(renderer);
             finalComposer.addPass(renderScene);
             finalComposer.addPass(finalPass);
         }
@@ -217,6 +222,7 @@
                         
                         let material = child.material;
                         
+                        // Ensure material is MeshPhysicalMaterial for PBR and transmission
                         if (!material.isMeshPhysicalMaterial) {
                             material = new THREE.MeshPhysicalMaterial().copy(material);
                             child.material = material;
