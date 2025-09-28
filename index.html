@@ -23,8 +23,8 @@
     
     <!-- 
         POST-PROCESSING PASSES (UMD versions from CDN) 
+        NOTE: These must load BEFORE the main script attempts to use their constructors (RenderPass, EffectComposer, etc.).
     -->
-    <!-- NOTE: These attach globally, not under THREE. namespace, which is why THREE. is omitted in the JS code below. -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script> 
@@ -39,11 +39,11 @@
         const CONFIG = {
             // RENDERER & ENVIRONMENT
             TONE_MAPPING_EXPOSURE: 1.0,          // Adjusted exposure for a balanced look (1.0 is standard)
-            BACKGROUND_COLOR: 0x111111,          // **KEY CHANGE: Dark background to create contrast for white objects**
-            HDR_ENVIRONMENT_INTENSITY: 0.7,      // Strength of the loaded 'env.hdr' map (slightly higher for ambient detail)
+            BACKGROUND_COLOR: 0x111111,          // KEY CHANGE: Dark background to create contrast for white objects
+            HDR_ENVIRONMENT_INTENSITY: 0.7,      // Strength of the loaded 'env.hdr' map
             
             // MATERIAL COLORS
-            CERAMIC_COLOR: 0xe8e8e8,             // Base color for sink, holder, etc. (Slightly gray for contrast)
+            CERAMIC_COLOR: 0xe8e8e8,             // Base color for sink, holder, etc.
             METAL_COLOR: 0x444444,               // Color for gripper and suspension (Dark Gray)
             LENS_EMISSIVE_COLOR: 0xffd8b0,       // Warm color for the light source
             SHADE_BASE_COLOR: 0xffffff,          // Base color for the translucent shade
@@ -53,11 +53,11 @@
             SHADE_TRANSMISSION: 0.9,             // High transmission (translucent)
             
             // LIGHT EMISSION INTENSITIES
-            LENS_EMISSIVE_INTENSITY: 40.0,       // Light source is now on (40.0 is a moderate intensity)
-            SHADE_EMISSIVE_INTENSITY: 0.0,       // Shade relies on the lens for illumination (0.0 means no self-emission)
+            LENS_EMISSIVE_INTENSITY: 40.0,       // Light source is now on (moderate intensity)
+            SHADE_EMISSIVE_INTENSITY: 0.0,       // Shade relies on the lens for illumination
             
             // POST-PROCESSING (UNREAL BLOOM)
-            BLOOM_STRENGTH: 5.0,                 // Increased bloom strength to emphasize the glow
+            BLOOM_STRENGTH: 5.0,                 // Increased bloom strength
             BLOOM_RADIUS: 0.5,                   // Spread of the glow effect
             BLOOM_THRESHOLD: 0.9                 // Only colors above this brightness will bloom
         };
@@ -94,12 +94,10 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Use CONFIG parameters
             renderer.toneMapping = THREE.CineonToneMapping; 
             renderer.toneMappingExposure = CONFIG.TONE_MAPPING_EXPOSURE; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            // Use CONFIG parameter
             renderer.setClearColor(CONFIG.BACKGROUND_COLOR); 
             document.body.appendChild(renderer.domElement);
 
@@ -119,7 +117,7 @@
             // 4. Setup Composers (Bloom Effect)
             setupComposers();
 
-            // 5. Load Assets (This will also load the HDR environment now)
+            // 5. Load Assets
             loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
@@ -127,12 +125,11 @@
         }
         
         function setupComposers() {
-            // FIX: Ensure all classes from UMD scripts are used without the THREE. prefix.
-            // They are globally available as: RenderPass, UnrealBloomPass, EffectComposer, ShaderPass.
+            // NOTE: RenderPass, UnrealBloomPass, EffectComposer, and ShaderPass are globally available 
+            // because they were loaded by <script> tags, so we use them without the 'THREE.' prefix.
             
             const renderScene = new RenderPass(scene, camera);
             
-            // Use CONFIG parameters for Bloom Pass
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
                 CONFIG.BLOOM_STRENGTH, 
@@ -140,13 +137,11 @@
                 CONFIG.BLOOM_THRESHOLD
             );
 
-            // FIX: Use EffectComposer, not THREE.EffectComposer (already fixed, keeping as is)
             bloomComposer = new EffectComposer(renderer);
             bloomComposer.renderToScreen = false;
             bloomComposer.addPass(renderScene);
             bloomComposer.addPass(bloomPass);
 
-            // FIX: Use ShaderPass, not THREE.ShaderPass (already fixed, keeping as is)
             const finalPass = new ShaderPass(
                 new THREE.ShaderMaterial({
                     uniforms: {
@@ -188,7 +183,6 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
                     renderer.autoClear = false; 
-                    // Use CONFIG parameter
                     scene.environmentIntensity = CONFIG.HDR_ENVIRONMENT_INTENSITY; 
                     loadAllModels();
                 },
@@ -243,10 +237,8 @@
                             material.side = THREE.DoubleSide; 
                             material.roughness = 0.9; 
                             material.metalness = 0.0;
-                            // Use CONFIG parameter
                             material.color.set(CONFIG.SHADE_BASE_COLOR); 
                             
-                            // Use CONFIG parameter
                             material.emissive.set(0x000000); 
                             material.emissiveIntensity = CONFIG.SHADE_EMISSIVE_INTENSITY; 
                             child.layers.enable(BLOOM_SCENE); 
@@ -255,21 +247,18 @@
                             // WARM EMISSIVE LENS: The primary light source
                             material.metalness = 0.0; material.roughness = 0.0;
                             material.color.set(0xffffff);
-                            // Use CONFIG parameters
                             material.emissive.set(CONFIG.LENS_EMISSIVE_COLOR); 
                             material.emissiveIntensity = CONFIG.LENS_EMISSIVE_INTENSITY; 
                             child.layers.enable(BLOOM_SCENE); // Mark for bloom
 
                         } else if (isCeramicPart(modelName)) {
-                            // CERAMIC PARTS: Defined by subtle color difference and surface roughness
-                            // Use CONFIG parameters
+                            // CERAMIC PARTS
                             material.metalness = 0.0; 
                             material.roughness = CONFIG.CERAMIC_ROUGHNESS; 
                             material.color.set(CONFIG.CERAMIC_COLOR); 
                             
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
-                            // METAL PARTS (Dark Gray Chrome)
-                            // Use CONFIG parameter
+                            // METAL PARTS
                             material.metalness = 0.9; 
                             material.roughness = 0.5; 
                             material.color.set(CONFIG.METAL_COLOR); 
@@ -333,7 +322,9 @@
             finalComposer.render();
         }
 
-        init();
+        // FIX: Ensure 'init' runs only after all external scripts (like RenderPass.js) are loaded.
+        window.onload = init;
+
     </script>
 </body>
 </html>
