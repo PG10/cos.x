@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Fixture Model</title>
+    <title>LED Fixture Model - Photorealistic Glow</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -15,6 +15,9 @@
     <script src="./js/RGBELoader.js"></script>
     <script src="./js/DRACOLoader.js"></script>
     <script src="./js/OrbitControls.js"></script>
+    <script src="./js/EffectComposer.js"></script>
+    <script src="./js/RenderPass.js"></script>
+    <script src="./js/UnrealBloomPass.js"></script> 
 
     <script>
         // --- FILE PATHS (All 8 Components) ---
@@ -27,7 +30,7 @@
         const SINK_MODEL_PATH       = '/cos.x/sink.glb';    
         const SUSPENSION_MODEL_PATH = '/cos.x/suspension.glb';
         
-        let scene, camera, renderer, controls;
+        let scene, camera, renderer, controls, composer;
         let models = {}; 
 
         function init() {
@@ -64,14 +67,26 @@
             controls.enableDamping = true;
             controls.update();
 
-            // *** EXTREME FIX: ADD HIGH-INTENSITY SPOT LIGHT ***
+            // *** REAL LIGHT SOURCE (FOR SHADE ILLUMINATION) ***
             const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
-            // Positioned slightly above the lens, aimed straight down (0, 0, 0)
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
             scene.add(spotLight.target);
             // --------------------------------------------------
+
+            // --- POST-PROCESSING SETUP (BLOOM/GLOW) ---
+            composer = new THREE.EffectComposer(renderer);
+            composer.addPass(new THREE.RenderPass(scene, camera));
+
+            const bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.0,  // strength
+                0.2,  // radius
+                0.01  // threshold (only affects very bright areas)
+            );
+            composer.addPass(bloomPass);
+            // ------------------------------------------
 
             loadHDRAndModels();
 
@@ -88,7 +103,7 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
 
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully. FINAL CODE ASSUMES A NEUTRAL STUDIO HDR.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully.");
 
                     loadAllModels();
                 },
@@ -124,13 +139,17 @@
                         
                         let material = child.material;
 
-                        // Ensure properties are reset and it's a Standard Material
+                        // Reset properties and ensure it's a Standard Material (or Physical)
                         material.transparent = false;
                         material.opacity = 1.0;
                         material.emissive.set(0x000000);
                         material.emissiveIntensity = 0.0;
                         
-                        if (!material.isMeshStandardMaterial) {
+                        // Handle conversion if necessary
+                        if (modelName === 'shade' && !material.isMeshPhysicalMaterial) {
+                            material = new THREE.MeshPhysicalMaterial().copy(material);
+                            child.material = material;
+                        } else if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) {
                             material = new THREE.MeshStandardMaterial().copy(material);
                             child.material = material;
                         }
@@ -144,23 +163,26 @@
                             // ALUMINA HEATSINK: Pure White, low sheen
                             metalness = 0.01; roughness = 0.4; color = 0xffffff; 
                         } else if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: Simulated glow
+                            // TRANSLUCENT SHADE: NOW USING MESHPHYSICALMATERIAL FOR SSS
                             metalness = 0.01; 
-                            roughness = 0.95; 
+                            roughness = 0.9; 
                             color = 0xffffff; 
-                            material.transparent = true; 
-                            material.opacity = 0.6; 
-                            material.side = THREE.DoubleSide; 
                             
-                            // SHADE GLOW SIMULATION
+                            // *** SSS Properties ***
+                            material.transmission = 0.8; 
+                            material.thickness = 0.5; 
+                            material.transparent = true;
+                            material.side = THREE.DoubleSide; 
+
+                            // SHADE GLOW SIMULATION (Boosted)
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 1.0; // Boosted simulated glow
+                            material.emissiveIntensity = 1.0; 
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (The visual light source - EXTREME BOOST)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 50.0; // Extreme intensity for visual clipping
+                            material.emissiveIntensity = 50.0; // Extreme intensity for visual clipping/bloom
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -197,7 +219,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Spot Light and Emissive intensity maxed out. Final render attempt.");
+                    console.log("MeshPhysicalMaterial and Unreal Bloom applied. Final photorealistic setup complete.");
                 }
             };
             
@@ -217,12 +239,14 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function animate() {
             requestAnimationFrame(animate);
             if (controls && controls.enableDamping) controls.update(); 
-            renderer.render(scene, camera);
+            // Render using the composer for the bloom effect
+            composer.render();
         }
 
         init();
