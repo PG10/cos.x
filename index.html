@@ -64,14 +64,14 @@
             controls.enableDamping = true;
             controls.update();
 
-            // *** FIX: ADD HIGH-INTENSITY SPOT LIGHT TO SIMULATE INTERNAL LIGHT SOURCE ***
-            const spotLight = new THREE.SpotLight(0xfff0dd, 200, 100, Math.PI / 4, 0.5);
+            // *** EXTREME FIX: ADD HIGH-INTENSITY SPOT LIGHT ***
+            const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
             // Positioned slightly above the lens, aimed straight down (0, 0, 0)
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
             scene.add(spotLight.target);
-            // ---------------------------------------------------------------------------
+            // --------------------------------------------------
 
             loadHDRAndModels();
 
@@ -152,15 +152,15 @@
                             material.opacity = 0.6; 
                             material.side = THREE.DoubleSide; 
                             
-                            // SHADE GLOW SIMULATION (Emissive handles the scattering light appearance)
+                            // SHADE GLOW SIMULATION
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.5; 
+                            material.emissiveIntensity = 1.0; // Boosted simulated glow
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The visual light source - power reduced as Spot Light handles illumination)
+                            // WARM EMISSIVE LENS (The visual light source - EXTREME BOOST)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 5.0; 
+                            material.emissiveIntensity = 50.0; // Extreme intensity for visual clipping
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -197,7 +197,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Spot Light and Cineon Tone Mapping applied for final photorealistic attempt.");
+                    console.log("Spot Light and Emissive intensity maxed out. Final render attempt.");
                 }
             };
             
