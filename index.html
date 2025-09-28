@@ -50,6 +50,12 @@
     // --- CONFIG ---
     const CONFIG = {
       TONE_MAPPING_EXPOSURE: 1.2,
+      CERAMIC_COLOR: 0xe8e8e8,
+      METAL_COLOR: 0x444444,
+      LENS_EMISSIVE_COLOR: 0xfff2e0,
+      SHADE_BASE_COLOR: 0xffffff,
+      CERAMIC_ROUGHNESS: 0.9,
+      SHADE_TRANSMISSION: 0.9,
       LENS_EMISSIVE_INTENSITY: 10.0,
       SHADE_EMISSIVE_INTENSITY: 0.05,
       BLOOM_STRENGTH: 1.2,
@@ -59,6 +65,7 @@
 
     let scene, camera, renderer, composer, controls;
     let lensObjects = [];
+    let modelsLoaded = 0;
 
     init();
 
@@ -104,22 +111,106 @@
       const loader = new GLTFLoader();
       loader.setDRACOLoader(dracoLoader);
 
-      // Load example model (replace with yours)
-      loader.load('./models/shade.glb', (gltf) => {
-        const obj = gltf.scene;
-        obj.traverse((child) => {
-          if (child.isMesh) {
-            child.material = new THREE.MeshPhysicalMaterial({
-              color: 0xffffff,
-              roughness: 0.9,
-              transmission: 0.9,
-              emissive: new THREE.Color(0xffd8b0),
-              emissiveIntensity: CONFIG.SHADE_EMISSIVE_INTENSITY
-            });
+      // Models to load
+      const modelPaths = {
+        shade: './models/shade.glb',
+        lens: './models/lens.glb',
+        holder: './models/holder.glb',
+        bands: './models/bands.glb',
+        feeds: './models/feeds.glb',
+        gripper: './models/gripper.glb',
+        suspension: './models/suspension.glb',
+        sink: './models/sink.glb'
+      };
+
+      const totalModels = Object.keys(modelPaths).length;
+
+      // Load function with materials
+      function loadPart(path, onMesh) {
+        loader.load(path, (gltf) => {
+          const obj = gltf.scene;
+          obj.traverse((child) => {
+            if (child.isMesh) onMesh(child);
+          });
+          scene.add(obj);
+
+          modelsLoaded++;
+          document.getElementById('loading').textContent =
+            `Loading models... ${modelsLoaded}/${totalModels}`;
+          if (modelsLoaded === totalModels) {
+            document.getElementById('loading').style.display = 'none';
           }
         });
-        scene.add(obj);
-        document.getElementById('loading').style.display = 'none';
+      }
+
+      // === Load each part ===
+      loadPart(modelPaths.shade, (mesh) => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: CONFIG.SHADE_BASE_COLOR,
+          roughness: CONFIG.CERAMIC_ROUGHNESS,
+          transmission: CONFIG.SHADE_TRANSMISSION,
+          thickness: 2.0,
+          emissive: new THREE.Color(0xffd8b0),
+          emissiveIntensity: CONFIG.SHADE_EMISSIVE_INTENSITY
+        });
+      });
+
+      loadPart(modelPaths.lens, (mesh) => {
+        mesh.material = new THREE.MeshPhysicalMaterial({
+          color: 0xffffff,
+          roughness: 0.3,
+          emissive: new THREE.Color(CONFIG.LENS_EMISSIVE_COLOR),
+          emissiveIntensity: CONFIG.LENS_EMISSIVE_INTENSITY
+        });
+        lensObjects.push(mesh);
+      });
+
+      loadPart(modelPaths.holder, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: CONFIG.CERAMIC_COLOR,
+          roughness: CONFIG.CERAMIC_ROUGHNESS,
+          metalness: 0.0
+        });
+      });
+
+      loadPart(modelPaths.bands, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: CONFIG.CERAMIC_COLOR,
+          roughness: CONFIG.CERAMIC_ROUGHNESS,
+          metalness: 0.1
+        });
+      });
+
+      loadPart(modelPaths.feeds, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: CONFIG.CERAMIC_COLOR,
+          roughness: CONFIG.CERAMIC_ROUGHNESS,
+          metalness: 0.0
+        });
+      });
+
+      loadPart(modelPaths.gripper, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: CONFIG.METAL_COLOR,
+          roughness: 0.4,
+          metalness: 1.0
+        });
+      });
+
+      loadPart(modelPaths.suspension, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: 0x222222,
+          roughness: 0.7,
+          metalness: 0.3
+        });
+      });
+
+      loadPart(modelPaths.sink, (mesh) => {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: CONFIG.METAL_COLOR,
+          roughness: 0.6,
+          metalness: 0.8
+        });
       });
 
       // Light
