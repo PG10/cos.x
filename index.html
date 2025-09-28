@@ -71,8 +71,8 @@
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
             renderer.toneMapping = THREE.CineonToneMapping; 
-            // FIX: Increased exposure to brighten the whole scene
-            renderer.toneMappingExposure = 1.0; 
+            // FIX 1: DRASTICALLY REDUCED EXPOSURE from 1.0 to 0.4 to counter scene washout (improves detail/contrast)
+            renderer.toneMappingExposure = 0.4; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             // Background is set to white, as per your target image
             renderer.setClearColor(0xffffff); 
@@ -90,7 +90,6 @@
             controls.update();
 
             // 3. REMOVED EXTERNAL SPOT LIGHT: Relying solely on emissive materials and bloom for light.
-            // This prevents external light from washing out the effect.
             
             // 4. Setup Composers (Bloom Effect)
             setupComposers();
@@ -109,11 +108,11 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                // FIX: DECREASED strength for a tighter, less blurry glow (WAS 1.5, now 0.8)
-                0.8,  // strength
+                // FIX 2: FURTHER DECREASED strength (WAS 0.8, now 0.5) for a more controlled glow.
+                0.5,  // strength
                 0.3,  // radius
-                // FIX: INCREASED threshold significantly to ONLY bloom the brightest parts (WAS 0.05, now 0.9)
-                0.9   // threshold 
+                // FIX 3: DECREASED threshold slightly (WAS 0.9, now 0.85) to capture a bit more glow from the shade.
+                0.85   // threshold 
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -142,10 +141,10 @@
                         varying vec2 vUv;
                         void main() {
                             // Add the bloom texture to the base texture
-                            // FIX: Increased the multiplier for the bloom texture to make the glow more visible
+                            // FIX: Increased the bloom multiplier (WAS 1.5, now 2.0) to compensate for lower strength and exposure.
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
-                            gl_FragColor = baseColor + (bloomColor * 1.5); // Multiplier remains 1.5
+                            gl_FragColor = baseColor + (bloomColor * 2.0); 
                         }
                     `,
                     defines: {}
@@ -222,24 +221,24 @@
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
-                            // FIX: Decreased shade emissive intensity significantly (WAS 5.0, now 1.0)
+                            // FIX: Shade emissive remains low (1.0) but will look more pronounced due to lower global exposure.
                             material.emissiveIntensity = 1.0; 
-                            // The shade will still glow because the LENS will bleed light through it via the bloom effect.
                             child.layers.enable(BLOOM_SCENE); // Glows
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // FIX: Lens emissive intensity remains high to trigger the high bloom threshold
-                            material.emissiveIntensity = 20.0; // Remains 20.0
+                            // FIX: Lens emissive intensity increased slightly (WAS 20.0, now 25.0) to ensure it hits the high bloom threshold.
+                            material.emissiveIntensity = 25.0; 
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
                             // METAL PARTS (Do NOT glow)
                             material.metalness = 0.9; 
                             material.roughness = modelName === 'gripper' ? 0.5 : 0.2; 
-                            material.color.set(modelName === 'gripper' ? 0xc0c0c0 : 0x444444);
+                            // FIX 4: Darkened the metal colors for better contrast and definition.
+                            material.color.set(modelName === 'gripper' ? 0x888888 : 0x222222);
                         }
                         
                         child.material.needsUpdate = true;
