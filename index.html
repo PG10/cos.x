@@ -72,8 +72,9 @@
             // Cineon Tone Mapping (for soft, non-clipping highlights)
             renderer.toneMapping = THREE.CineonToneMapping; 
             // FIX: Increased exposure to brighten the whole scene
-            renderer.toneMappingExposure = 1.0; // WAS 0.7
+            renderer.toneMappingExposure = 1.0; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
+            // Background is set to white, as per your target image
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
@@ -88,14 +89,9 @@
             controls.enableDamping = true;
             controls.update();
 
-            // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
-            // FIX: Increased intensity back up to 100 to properly illuminate the non-glowing parts.
-            const spotLight = new THREE.SpotLight(0xfff0dd, 100, 100, Math.PI / 4, 0.5); // WAS 10, now 100
-            spotLight.position.set(0, 5, 0); 
-            spotLight.target.position.set(0, 0, 0); 
-            scene.add(spotLight);
-            scene.add(spotLight.target);
-
+            // 3. REMOVED EXTERNAL SPOT LIGHT: Relying solely on emissive materials and bloom for light.
+            // This prevents external light from washing out the effect.
+            
             // 4. Setup Composers (Bloom Effect)
             setupComposers();
 
@@ -113,10 +109,11 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                0.5,  // strength
-                // FIX: Slightly increased radius for a softer spread
-                0.3,  // radius (WAS 0.2)
-                0.1   // threshold 
+                // FIX: Increased strength for more dramatic glow
+                1.5,  // strength (WAS 0.5)
+                0.3,  // radius
+                // FIX: Decreased threshold to include brighter parts of the translucent shade
+                0.05   // threshold (WAS 0.1)
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -129,7 +126,8 @@
                 new THREE.ShaderMaterial({
                     uniforms: {
                         baseTexture: { value: null },
-                        bloomTexture: { value: bloomComposer.renderTarget2.texture }
+                        // Check: Ensure we use the correct render target texture
+                        bloomTexture: { value: bloomComposer.renderTarget2.texture } 
                     },
                     vertexShader: `
                         varying vec2 vUv;
@@ -144,7 +142,10 @@
                         varying vec2 vUv;
                         void main() {
                             // Add the bloom texture to the base texture
-                            gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+                            // FIX: Increased the multiplier for the bloom texture to make the glow more visible
+                            vec4 baseColor = texture2D( baseTexture, vUv );
+                            vec4 bloomColor = texture2D( bloomTexture, vUv );
+                            gl_FragColor = baseColor + (bloomColor * 1.5); // Multiplier increased to 1.5
                         }
                     `,
                     defines: {}
@@ -221,15 +222,16 @@
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 1.0; 
+                            // FIX: Increased shade emissive intensity
+                            material.emissiveIntensity = 5.0; // WAS 1.0, now 5.0
                             child.layers.enable(BLOOM_SCENE); // Glows
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // Emissive strength is maintained at 2.0
-                            material.emissiveIntensity = 2.0; 
+                            // FIX: Significantly increased lens emissive intensity
+                            material.emissiveIntensity = 20.0; // WAS 2.0, now 20.0
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
