@@ -10,11 +10,11 @@
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/RGBELoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/DRACOLoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/RGBELoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/controls/OrbitControls.js"></script>
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
@@ -41,8 +41,11 @@
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // Setup Controls (Using the standard constructor call, now guaranteed to work with r125)
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            // --- Constructor Fix (Still needed for compatibility) ---
+            const OrbitControlsConstructor = THREE.OrbitControls; 
+
+            // Setup Controls
+            controls = new OrbitControlsConstructor(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             controls.enableDamping = true;
             controls.update();
