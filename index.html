@@ -12,10 +12,8 @@
 <body>
     <!-- 
         FIX: Switching all Three.js Examples files to CDN links (r128) 
-        to resolve 'Uncaught SyntaxError: Cannot use import statement outside a module' 
-        and 'THREE.EffectComposer is not a constructor' errors. 
     -->
-    <script src="./js/three.min.js"></script> <!-- Assuming core is still local -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     
     <!-- Standard Example Loaders (UMD versions from CDN) -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -71,15 +69,20 @@
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
             renderer.toneMapping = THREE.CineonToneMapping; 
-            // FIX 1: DRASTICALLY REDUCED EXPOSURE from 1.0 to 0.4 to counter scene washout (improves detail/contrast)
-            renderer.toneMappingExposure = 0.4; 
+            // FIX: Drastically reduced exposure for white background
+            renderer.toneMappingExposure = 0.3; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
-            // Background is set to white, as per your target image
+            
+            // FIX: Revert background to white
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
             // 2. Setup Scene and Camera
             scene = new THREE.Scene();
+            // FIX: Boosted AmbientLight to ensure non-emissive parts are visible on white background
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); // Intensity 1.0
+            scene.add(ambientLight);
+
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
             
@@ -88,8 +91,6 @@
             controls.target.set(0, 0, 0); 
             controls.enableDamping = true;
             controls.update();
-
-            // 3. REMOVED EXTERNAL SPOT LIGHT: Relying solely on emissive materials and bloom for light.
             
             // 4. Setup Composers (Bloom Effect)
             setupComposers();
@@ -108,10 +109,11 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                // FIX 2: FURTHER DECREASED strength (WAS 0.8, now 0.5) for a more controlled glow.
+                // FIX: Reduced strength for a tighter glow
                 0.5,  // strength
+                // FIX: Reduced radius for less atmospheric spread
                 0.3,  // radius
-                // FIX 3: DECREASED threshold slightly (WAS 0.9, now 0.85) to capture a bit more glow from the shade.
+                // Threshold kept high to only focus on the lens
                 0.85   // threshold 
             );
 
@@ -125,7 +127,6 @@
                 new THREE.ShaderMaterial({
                     uniforms: {
                         baseTexture: { value: null },
-                        // Check: Ensure we use the correct render target texture
                         bloomTexture: { value: bloomComposer.renderTarget2.texture } 
                     },
                     vertexShader: `
@@ -140,11 +141,10 @@
                         uniform sampler2D bloomTexture;
                         varying vec2 vUv;
                         void main() {
-                            // Add the bloom texture to the base texture
-                            // FIX: Increased the bloom multiplier (WAS 1.5, now 2.0) to compensate for lower strength and exposure.
+                            // Bloom multiplier reduced slightly due to high ambient light
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
-                            gl_FragColor = baseColor + (bloomColor * 2.0); 
+                            gl_FragColor = baseColor + (bloomColor * 1.0); 
                         }
                     `,
                     defines: {}
@@ -163,7 +163,10 @@
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
+                    // FIX: Halved the environment map intensity so it contributes less to the overall brightness
                     scene.environment = texture; 
+                    renderer.autoClear = false; // Important for bloom to work
+                    scene.environmentIntensity = 0.5; // New property (Three.js r128 compatible)
                     loadAllModels();
                 },
                 undefined, 
@@ -214,31 +217,32 @@
                         if (modelName === 'shade') {
                             // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL 
                             material.transmission = 0.8; 
-                            material.thickness = 0.5; 
+                            // FIX: Increased thickness slightly to help the shade stand out
+                            material.thickness = 0.8; 
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
                             material.roughness = 0.9; 
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
-                            // FIX: Shade emissive remains low (1.0) but will look more pronounced due to lower global exposure.
-                            material.emissiveIntensity = 1.0; 
+                            // Emissive kept low so the shade itself doesn't bloom too much
+                            material.emissiveIntensity = 0.5; 
                             child.layers.enable(BLOOM_SCENE); // Glows
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // FIX: Lens emissive intensity increased slightly (WAS 20.0, now 25.0) to ensure it hits the high bloom threshold.
-                            material.emissiveIntensity = 25.0; 
+                            // Lens emissive kept high to ensure it passes the high bloom threshold
+                            material.emissiveIntensity = 20.0; 
                             child.layers.enable(BLOOM_SCENE); // Glows
 
-                        } else if (modelName === 'gripper' || modelName === 'suspension') {
+                        } else if (modelName === 'gripper' || modelName === 'suspension' || modelName === 'sink') {
                             // METAL PARTS (Do NOT glow)
                             material.metalness = 0.9; 
                             material.roughness = modelName === 'gripper' ? 0.5 : 0.2; 
-                            // FIX 4: Darkened the metal colors for better contrast and definition.
-                            material.color.set(modelName === 'gripper' ? 0x888888 : 0x222222);
+                            // Set metallic colors to a neutral gray that will be clearly visible against white due to high ambient light
+                            material.color.set(0x444444);
                         }
                         
                         child.material.needsUpdate = true;
