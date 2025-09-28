@@ -32,10 +32,9 @@
 
         function init() {
             // --- EASY VIEW ADJUSTMENT VARIABLES ---
-            // Adjust these three values to control the initial view and zoom limits.
-            const INITIAL_CAMERA_Z = 50.0; // Distance of the camera from the center (0,0,0)
-            const MIN_ZOOM_DISTANCE = 1.0;  // Closest you can zoom in (e.g., 1.0)
-            const MAX_ZOOM_DISTANCE = 500.0; // Farthest you can zoom out
+            const INITIAL_CAMERA_Z = 50.0; 
+            const MIN_ZOOM_DISTANCE = 1.0;  
+            const MAX_ZOOM_DISTANCE = 500.0; 
             // --------------------------------------
 
             // Setup Renderer
@@ -43,7 +42,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 0.5; 
+            renderer.toneMappingExposure = 0.7; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             renderer.setClearColor(0xffffff); 
@@ -53,30 +52,41 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // Camera position set using the adjustable Z distance
             camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
-            
-            // Add Lights 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
-            scene.add(ambientLight);
-
-            const ledLight = new THREE.PointLight(0xffeebb, 1000, 500); 
-            ledLight.position.set(0, 5, 0); 
-            scene.add(ledLight);
             
             // OrbitControls Setup
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
-            // Control limits set using the adjustable variables
             controls.minDistance = MIN_ZOOM_DISTANCE; 
             controls.maxDistance = MAX_ZOOM_DISTANCE; 
             controls.enableDamping = true;
             controls.update();
-            
-            loadAllModels(); 
+
+            loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
             animate();
+        }
+
+        function loadHDRAndModels() {
+            // Load the HDR Environment Map - NOW LINKING TO 'env.hdr'
+            new THREE.RGBELoader()
+                .setPath('/cos.x/')
+                .load('env.hdr', function (texture) { // <-- The path you requested: 'env.hdr'
+                    
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+
+                    // Apply to scene environment (for PBR materials)
+                    scene.environment = texture;
+
+                    console.log("HDR Environment Map 'env.hdr' loaded.");
+
+                    // After environment is set, load the models
+                    loadAllModels();
+                },
+                (xhr) => console.log(((xhr.loaded / xhr.total) * 100).toFixed(0) + '% loaded HDR'),
+                (error) => console.error("Error loading 'env.hdr': Make sure 'env.hdr' is in the /cos.x/ folder.", error)
+            );
         }
 
         function loadAllModels() {
@@ -95,6 +105,8 @@
                 'gripper': GRIPPER_MODEL_PATH,
                 'holder': HOLDER_MODEL_PATH,
                 'lens': LENS_MODEL_PATH,
+                'shade': SHADE_MODEL_PATH,
+                'sink': SINK_MODEL_PATH,    
                 'suspension': SUSPENSION_MODEL_PATH
             };
 
@@ -112,22 +124,23 @@
                         material.emissiveIntensity = 0.0;
                         material.needsUpdate = true;
                         
-                        // --- MATERIAL CUSTOMIZATION (ALL COMPLETE) ---
+                        // --- MATERIAL CUSTOMIZATION ---
                         let metalness = 0.0;
                         let roughness = 0.5;
                         let color = 0xffffff;
 
                         if (modelName === 'sink') {
-                            // ALUMINA HEATSINK
+                            // ALUMINA HEATSINK: Pure White, slight sheen porcelain effect
                             metalness = 0.05; roughness = 0.3; color = 0xffffff; 
                         } else if (modelName === 'shade') {
-                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE
+                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE:
                             metalness = 0.05; roughness = 0.9; color = 0xffffff; 
                             material.transparent = true; material.opacity = 0.7; 
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS
+                            // WARM EMISSIVE LENS (The only necessary light source remaining)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
-                            material.emissive.set(0xffeebb); material.emissiveIntensity = 1.5; 
+                            material.emissive.set(0xffeebb); 
+                            material.emissiveIntensity = 3.5; // Increased emissive for a bright light source
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -152,49 +165,4 @@
 
                 models[modelName] = loadedModel;
                 
-                // --- POSITIONING LOGIC (READY FOR ASSEMBLY) ---
-                // *** SCALE IS NOW A SENSIBLE VALUE based on correct export ***
-                const defaultScale = 1.0; 
-                
-                // Since transforms were applied in Blender, the position is now 0,0,0 
-                // and the scale is 1.0, and they will load in correct relation to each other.
-                loadedModel.position.set(0, 0, 0); 
-                loadedModel.scale.set(defaultScale, defaultScale, defaultScale);
-                
-                scene.add(loadedModel);
-                modelsLoaded++;
-
-                if (modelsLoaded === totalModels) {
-                    console.log("All 8 models loaded successfully at the correct scale!");
-                    console.log("Next: Adjust the INITIAL_CAMERA_Z value at the top of the 'init()' function to get the perfect starting view.");
-                }
-            };
-            
-            // Loop through all paths to load models
-            Object.keys(modelPaths).forEach(modelName => {
-                gltfLoader.load(modelPaths[modelName], 
-                    (gltf) => onModelLoaded(gltf, modelName), 
-                    undefined, 
-                    (error) => {
-                        console.error(`Error loading ${modelName}:`, error);
-                    }
-                );
-            });
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (controls && controls.enableDamping) controls.update(); 
-            renderer.render(scene, camera);
-        }
-
-        init();
-    </script>
-</body>
-</html>
+                // --- POSITIONING LOG
