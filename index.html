@@ -30,8 +30,6 @@
         let scene, camera, renderer, controls;
         let models = {}; 
 
-        // *** REMOVED: sceneOffset variable ***
-
         function init() {
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -48,24 +46,22 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             
-            // *** REVERTED: Original Camera Position ***
-            camera.position.set(0.0, 10.0, 100.0); 
+            // *** CHANGE 1: Move Camera Closer to 0,0,0 to catch the large objects ***
+            camera.position.set(0.0, 10.0, 20.0); 
             
             // Add Lights 
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
             scene.add(ambientLight);
 
             const ledLight = new THREE.PointLight(0xffeebb, 1000, 500); 
-            // *** REVERTED: Original Light Position ***
             ledLight.position.set(0, 5, 0); 
             scene.add(ledLight);
             
             // OrbitControls Setup
             controls = new THREE.OrbitControls(camera, renderer.domElement);
-            // *** REVERTED: Original Controls Target ***
             controls.target.set(0, 0, 0); 
-            controls.minDistance = 10.0;
-            controls.maxDistance = 200.0;
+            controls.minDistance = 1.0; // Allow close zoom for assembly
+            controls.maxDistance = 200.0; 
             controls.enableDamping = true;
             controls.update();
             
@@ -173,11 +169,14 @@
                 
                 // Apply positioning based on the large scale
                 if (modelName === 'shade') {
-                    loadedModel.position.set(0, -20.0 * defaultScale, 0); 
+                    // *** CHANGE 2: Position Shade closer to Y=0 ***
+                    loadedModel.position.set(0, 0, 0); 
                 } else if (modelName === 'suspension') {
-                    loadedModel.position.set(0, 50.0 * defaultScale, 0);
+                    // Position suspension well above the shade
+                    loadedModel.position.set(0, 20.0 * defaultScale, 0);
                 } else {
-                    loadedModel.position.set(0, 0, 0); // All other components start at the origin (0,0,0)
+                    // All other small components start at the origin (0,0,0)
+                    loadedModel.position.set(0, 0, 0); 
                 }
                 
                 scene.add(loadedModel);
