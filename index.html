@@ -18,8 +18,8 @@
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
-        const MODEL_PATH = 'sink.glb';      // The low-poly, Normal-Mapped model
-        const HDRI_PATH = 'studio1.hdr';    // The environment map for lighting
+        const MODEL_PATH = 'sink.glb';      // Corrected file name
+        const HDRI_PATH = 'studio1.hdr';    // Corrected file name
 
         let scene, camera, renderer, model;
 
@@ -28,7 +28,7 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Physical rendering settings for accurate lighting (HDRI)
+            // Physical rendering settings
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
@@ -39,14 +39,14 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // Adjust camera position to focus on your small object
-            const distance = 0.15; // Set a good starting distance
+            // Adjust camera position for your small object
+            const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
             // Setup Controls
             const controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.target.set(0, 0, 0); // Center the rotation target
-            controls.enableDamping = true; // Smooth rotation
+            controls.target.set(0, 0, 0); 
+            controls.enableDamping = true;
             controls.update();
 
             // Load Environment Map (HDRI for lighting)
@@ -57,7 +57,7 @@
                 .setDataType(THREE.FloatType)
                 .load(HDRI_PATH, function (texture) {
                     const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-                    scene.environment = envMap; // Use HDRI for environment lighting and reflections
+                    scene.environment = envMap; 
                     texture.dispose();
                     pmremGenerator.dispose();
                     loadModel(); // Load model after environment map is ready
@@ -68,10 +68,12 @@
         }
 
         function loadModel() {
-            // --- DRACO FIX (CRITICAL for compressed model loading) ---
+            // --- DRACO FIX (FINAL CORRECTION) ---
             const dracoLoader = new THREE.DRACOLoader();
-            // This line tells the loader to look in the local 'draco' folder
-            dracoLoader.setDecoderPath('./draco/'); 
+            
+            // **ABSOLUTE PATH FIX**: This points directly to the 'draco' folder 
+            // from the root of your GitHub Pages site, fixing the 404/TypeError.
+            dracoLoader.setDecoderPath('/cos.x/draco/'); 
 
             const loader = new THREE.GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
@@ -79,11 +81,6 @@
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 scene.add(model);
-                
-                // Optional: Fit the model to the view if its imported scale is unexpected
-                // const box = new THREE.Box3().setFromObject(model);
-                // const center = box.getCenter(new THREE.Vector3());
-                // model.position.sub(center); // Recenter the model
 
             }, undefined, function (error) {
                 console.error('An error happened loading the model:', error);
