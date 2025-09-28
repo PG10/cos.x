@@ -71,8 +71,8 @@
             
             // Cineon Tone Mapping (for soft, non-clipping highlights)
             renderer.toneMapping = THREE.CineonToneMapping; 
-            // Exposure setting affects both the final combined scene and the bloom target
-            renderer.toneMappingExposure = 0.7; 
+            // FIX: Increased exposure to brighten the whole scene
+            renderer.toneMappingExposure = 1.0; // WAS 0.7
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
@@ -89,9 +89,8 @@
             controls.update();
 
             // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
-            // FIX: Drastically reduced intensity to prevent scene washout. 
-            // The glow should primarily come from the emissive material + bloom.
-            const spotLight = new THREE.SpotLight(0xfff0dd, 10, 100, Math.PI / 4, 0.5); // WAS 500, now 50
+            // FIX: Increased intensity back up to 100 to properly illuminate the non-glowing parts.
+            const spotLight = new THREE.SpotLight(0xfff0dd, 100, 100, Math.PI / 4, 0.5); // WAS 10, now 100
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
             scene.add(spotLight);
@@ -114,9 +113,9 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                // FIX: Reduced strength significantly for a subtle glow
-                0.5,  // WAS 0.8 -> Reduced bloom strength (0.5 is a good starting point)
-                0.2,  // radius (Controls glow radius)
+                0.5,  // strength
+                // FIX: Slightly increased radius for a softer spread
+                0.3,  // radius (WAS 0.2)
                 0.1   // threshold 
             );
 
@@ -229,8 +228,8 @@
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // FIX: Reduced emissive intensity to prevent primary source from washing out.
-                            material.emissiveIntensity = 2.0; // WAS 5.0
+                            // Emissive strength is maintained at 2.0
+                            material.emissiveIntensity = 2.0; 
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
