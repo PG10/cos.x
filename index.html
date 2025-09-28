@@ -63,9 +63,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Increased exposure slightly to brighten the overall scene.
+            // Reverting exposure back down to ensure objects have contrast.
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.5; // Increased from 0.3
+            renderer.toneMappingExposure = 0.3; // Reverted from 0.5
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             renderer.setClearColor(0xffffff); // White background
@@ -101,8 +101,8 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                0.5,  // strength (lower for white background)
-                0.3,  // radius (tighter glow)
+                0.5,  // strength
+                0.3,  // radius 
                 0.85   // threshold 
             );
 
@@ -151,7 +151,7 @@
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
                     renderer.autoClear = false; 
-                    // Low environment map contribution to rely more on AmbientLight
+                    // Low environment map contribution
                     scene.environmentIntensity = 0.1; 
                     loadAllModels();
                 },
@@ -193,6 +193,9 @@
                         // --- APPLY FINAL PBR AND GLOW PROPERTIES ---
                         material.emissive.set(0x000000); // Base emissive reset
                         child.layers.set(ENTIRE_SCENE); 
+                        
+                        // Define the color for white parts (slightly off-white for contrast)
+                        const WHITE_PART_COLOR = 0xf0f0f0;
 
                         if (modelName === 'shade') {
                             // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL 
@@ -202,7 +205,8 @@
                             material.side = THREE.DoubleSide; 
                             material.roughness = 0.9; 
                             material.metalness = 0.0;
-                            material.color.set(0xffffff);
+                            // Shade color set to off-white for definition against background
+                            material.color.set(WHITE_PART_COLOR); 
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
@@ -217,11 +221,11 @@
                             child.layers.enable(BLOOM_SCENE); 
 
                         } else if (isWhitePart(modelName)) {
-                            // CERAMIC/PLASTIC PARTS (Matte White)
-                            // Force pure white and extremely high roughness to avoid metallic look
+                            // CERAMIC/PLASTIC PARTS (Matte Off-White)
                             material.metalness = 0.0; 
                             material.roughness = 1.0; // Max roughness (pure matte)
-                            material.color.set(0xffffff); // Pure white
+                            // Sink/Holder color set to off-white for definition against background
+                            material.color.set(WHITE_PART_COLOR); 
                             
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
                             // METAL PARTS (Dark Gray Chrome)
