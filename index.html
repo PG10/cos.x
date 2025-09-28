@@ -10,30 +10,36 @@
     </style>
 </head>
 <body>
+    <!-- 
+        ASSUMPTION: All .js files are in a local ./js/ folder
+    -->
     <script src="./js/three.min.js"></script>
     <script src="./js/GLTFLoader.js"></script>
     <script src="./js/RGBELoader.js"></script>
     <script src="./js/DRACOLoader.js"></script>
     <script src="./js/OrbitControls.js"></script>
     
+    <!-- POST-PROCESSING PASSES (UMD versions required) -->
     <script src="./js/EffectComposer.js"></script>
     <script src="./js/RenderPass.js"></script>
     <script src="./js/UnrealBloomPass.js"></script> 
     
+    <!-- SHADER FILES REQUIRED FOR THE COMPOSER CHAIN -->
     <script src="./js/CopyShader.js"></script>
     <script src="./js/LuminosityHighPassShader.js"></script>
     <script src="./js/ShaderPass.js"></script>
     
     <script>
-        // --- FILE PATHS (All 8 Components) ---
-        const BANDS_MODEL_PATH      = '/cos.x/bands.glb';
-        const FEEDS_MODEL_PATH      = '/cos.x/feeds.glb';
-        const GRIPPER_MODEL_PATH    = '/cos.x/gripper.glb';
-        const HOLDER_MODEL_PATH     = '/cos.x/holder.glb';
-        const LENS_MODEL_PATH       = '/cos.x/lens.glb';
-        const SHADE_MODEL_PATH      = '/cos.x/shade.glb';
-        const SINK_MODEL_PATH       = '/cos.x/sink.glb';    
-        const SUSPENSION_MODEL_PATH = '/cos.x/suspension.glb';
+        // --- FILE PATH CORRECTION APPLIED ---
+        // Assuming models are in the root directory (where index.html is)
+        const BANDS_MODEL_PATH      = './bands.glb';
+        const FEEDS_MODEL_PATH      = './feeds.glb';
+        const GRIPPER_MODEL_PATH    = './gripper.glb';
+        const HOLDER_MODEL_PATH     = './holder.glb';
+        const LENS_MODEL_PATH       = './lens.glb';
+        const SHADE_MODEL_PATH      = './shade.glb';
+        const SINK_MODEL_PATH       = './sink.glb';    
+        const SUSPENSION_MODEL_PATH = './suspension.glb';
         
         let scene, camera, renderer, controls;
         let bloomComposer, finalComposer;
@@ -58,3 +64,237 @@
             // 1. Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            // Cineon Tone Mapping (for soft, non-clipping highlights)
+            renderer.toneMapping = THREE.CineonToneMapping; 
+            renderer.toneMappingExposure = 1.2; 
+            renderer.outputColorSpace = THREE.SRGBColorSpace; 
+            renderer.setClearColor(0xffffff); 
+            document.body.appendChild(renderer.domElement);
+
+            // 2. Setup Scene and Camera
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
+            camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 0, 0); 
+            controls.enableDamping = true;
+            controls.update();
+
+            // 3. EXTREME SPOT LIGHT (Real light to illuminate the translucent shade)
+            const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
+            spotLight.position.set(0, 5, 0); 
+            spotLight.target.position.set(0, 0, 0); 
+            scene.add(spotLight);
+            scene.add(spotLight.target);
+
+            // 4. Setup Composers (Bloom Effect)
+            setupComposers();
+
+            // 5. Load Assets
+            loadHDRAndModels();
+
+            window.addEventListener('resize', onWindowResize, false);
+            // CRUCIAL: Start the animation loop after setup
+            animate();
+        }
+        
+        function setupComposers() {
+            // --- BLOOM COMPOSER (Renders ONLY the glow objects) ---
+            // RenderPass is required as the first pass
+            const renderScene = new THREE.RenderPass(scene, camera);
+            
+            const bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.0,  // strength
+                0.2,  // radius
+                0.01  // threshold (Only objects with high emissiveIntensity will glow)
+            );
+
+            bloomComposer = new THREE.EffectComposer(renderer);
+            bloomComposer.renderToScreen = false;
+            bloomComposer.addPass(renderScene);
+            bloomComposer.addPass(bloomPass);
+
+            // --- FINAL COMPOSER (Combines the original scene and the bloom texture) ---
+            const finalPass = new THREE.ShaderPass(
+                new THREE.ShaderMaterial({
+                    uniforms: {
+                        baseTexture: { value: null },
+                        bloomTexture: { value: bloomComposer.renderTarget2.texture }
+                    },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform sampler2D baseTexture;
+                        uniform sampler2D bloomTexture;
+                        varying vec2 vUv;
+                        void main() {
+                            // Add the bloom texture to the base texture
+                            gl_FragColor = ( texture2D( baseTexture, vUv ) + vec4( 1.0 ) * texture2D( bloomTexture, vUv ) );
+                        }
+                    `,
+                    defines: {}
+                }), "baseTexture"
+            );
+            finalPass.needsSwap = true;
+
+            finalComposer = new THREE.EffectComposer(renderer);
+            finalComposer.addPass(renderScene);
+            finalComposer.addPass(finalPass);
+        }
+
+        function loadHDRAndModels() {
+            // Load the HDR Environment Map (env.hdr is assumed to be in the root directory)
+            new THREE.RGBELoader()
+                .setPath('./') 
+                .load('env.hdr', function (texture) {
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+                    scene.environment = texture; 
+                    loadAllModels();
+                },
+                undefined, 
+                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Check server path.", error)
+            );
+        }
+
+        function loadAllModels() {
+            const dracoLoader = new THREE.DRACOLoader();
+            // DRACO PATH CORRECTION: Assuming 'draco' folder is next to index.html
+            dracoLoader.setDecoderPath('./draco/'); 
+            
+            const gltfLoader = new THREE.GLTFLoader();
+            gltfLoader.setDRACOLoader(dracoLoader);
+
+            const modelPaths = {
+                'sink': SINK_MODEL_PATH, 'shade': SHADE_MODEL_PATH, 'bands': BANDS_MODEL_PATH, 
+                'feeds': FEEDS_MODEL_PATH, 'gripper': GRIPPER_MODEL_PATH, 'holder': HOLDER_MODEL_PATH, 
+                'lens': LENS_MODEL_PATH, 'suspension': SUSPENSION_MODEL_PATH
+            };
+
+            const onModelLoaded = (gltf, modelName) => {
+                const loadedModel = gltf.scene;
+                
+                loadedModel.traverse((child) => {
+                    if (child.isMesh) {
+                        
+                        let material = child.material;
+                        
+                        // Ensure it's a PBR material
+                        if (modelName === 'shade' && !material.isMeshPhysicalMaterial) {
+                            material = new THREE.MeshPhysicalMaterial().copy(material);
+                            child.material = material;
+                        } else if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) {
+                            material = new THREE.MeshStandardMaterial().copy(material);
+                            child.material = material;
+                        }
+
+                        // --- APPLY FINAL PBR AND GLOW PROPERTIES ---
+                        material.metalness = 0.0;
+                        material.roughness = 0.5;
+                        material.color.set(0xffffff);
+                        material.emissive.set(0x000000); // Base emissive reset
+                        
+                        // Set all models to the base scene layer by default
+                        child.layers.set(ENTIRE_SCENE); 
+
+                        if (modelName === 'shade') {
+                            // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL 
+                            material.transmission = 0.8; 
+                            material.thickness = 0.5; 
+                            material.transparent = true;
+                            material.side = THREE.DoubleSide; 
+                            material.roughness = 0.9; 
+                            
+                            // SHADE GLOW (Target for Bloom)
+                            material.emissive.set(0xffeebb);
+                            material.emissiveIntensity = 1.0; 
+                            child.layers.enable(BLOOM_SCENE); // Glows
+                            
+                        } else if (modelName === 'lens') {
+                            // WARM EMISSIVE LENS (Primary light source)
+                            material.metalness = 0.1; material.roughness = 0.1; 
+                            material.emissive.set(0xffeebb); 
+                            material.emissiveIntensity = 50.0; // Extreme intensity for big bloom
+                            child.layers.enable(BLOOM_SCENE); // Glows
+
+                        } else if (modelName === 'gripper' || modelName === 'suspension') {
+                            // METAL PARTS (Do NOT glow)
+                            material.metalness = 0.9; 
+                            material.roughness = modelName === 'gripper' ? 0.5 : 0.2; 
+                            material.color.set(modelName === 'gripper' ? 0xc0c0c0 : 0x444444);
+                        }
+                        
+                        child.material.needsUpdate = true;
+                        // --- END MATERIAL CUSTOMIZATION ---
+                    }
+                });
+                
+                // Positioning
+                loadedModel.position.set(0, 0, 0); 
+                loadedModel.scale.set(1.0, 1.0, 1.0);
+                scene.add(loadedModel);
+            };
+            
+            // Load all models
+            Object.keys(modelPaths).forEach(modelName => {
+                gltfLoader.load(modelPaths[modelName], 
+                    (gltf) => onModelLoaded(gltf, modelName), 
+                    undefined, 
+                    (error) => console.error(`Error loading ${modelName}:`, error)
+                );
+            });
+        }
+        
+        // --- SELECTIVE BLOOM RENDER UTILITIES ---
+        function darkenNonBloomed(obj) {
+            if (obj.isMesh && bloomLayer.test(obj.layers) === false) {
+                // Save the original material and replace it with black
+                materials[obj.uuid] = obj.material;
+                obj.material = darkMaterial;
+            }
+        }
+
+        function restoreMaterial(obj) {
+            // Restore the original material
+            if (materials[obj.uuid]) {
+                obj.material = materials[obj.uuid];
+                delete materials[obj.uuid];
+            }
+        }
+        // ---------------------------------------
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            bloomComposer.setSize(window.innerWidth, window.innerHeight); 
+            finalComposer.setSize(window.innerWidth, window.innerHeight); 
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update(); 
+            
+            // 1. Render the scene, but make all non-glowing objects black
+            scene.traverse(darkenNonBloomed);
+            bloomComposer.render();
+
+            // 2. Restore all original materials
+            scene.traverse(restoreMaterial);
+            
+            // 3. Render the final combined scene (original objects + bloom)
+            finalComposer.render();
+        }
+
+        init();
+    </script>
+</body>
+</html>
