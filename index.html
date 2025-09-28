@@ -10,15 +10,14 @@
     </style>
 </head>
 <body>
-    <script src="https://unpkg.com/three@0.155.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/RGBELoader.js"></script>
-    <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/DRACOLoader.js"></script>
-    
-    <script src="https://unpkg.com/three@0.155.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/RGBELoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/examples/js/controls/OrbitControls.js"></script>
 
     <script>
-        // --- FILE PATHS (Pulls from your repository root: /cos.x/) ---
+        // --- FILE PATHS (Pulls from your repository root) ---
         const MODEL_PATH = 'sink.glb';
         const HDRI_PATH = 'studio1.hdr';
 
@@ -42,13 +41,8 @@
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // --- *** THE FIX IS HERE: Use the script's global reference (window) *** ---
-            // If the script successfully loaded, it defined OrbitControls globally.
-            // We ensure we call the function regardless of how THREE registered it.
-            const OrbitControls = THREE.OrbitControls; 
-
-            // Setup Controls
-            controls = new OrbitControls(camera, renderer.domElement);
+            // Setup Controls (Using the standard constructor call, now guaranteed to work with r125)
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             controls.enableDamping = true;
             controls.update();
