@@ -63,9 +63,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Set exposure for bright scene and increased to compensate for removal of point/ambient lights
+            // Set exposure high to define white objects against a white background via HDR reflections
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.8; 
+            renderer.toneMappingExposure = 2.0; // Dramatically increased exposure
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             // Set background to pure white
@@ -74,9 +74,6 @@
 
             // 2. Setup Scene and Camera
             scene = new THREE.Scene();
-            
-            // 3. Lighting Setup (Only HDR environment will be used)
-            // Removed: ambientLight, pointLight, fillLight
             
             // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
@@ -104,9 +101,9 @@
             // Bloom Pass: High strength and threshold to focus the glow only on the brightest parts
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                2.0,  // strength (HIGH strength for dramatic glow)
+                2.0,  // strength 
                 0.3,  // radius 
-                0.9   // threshold (HIGH threshold so only the lens and bright shade glow)
+                0.9   // threshold 
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -201,25 +198,23 @@
                         material.emissive.set(0x000000); 
                         child.layers.set(ENTIRE_SCENE); 
                         
-                        // Slightly off-white to ensure a subtle shadow against pure white background
-                        // *** ADJUSTED CERAMIC COLOR FOR CONTRAST ***
-                        const CERAMIC_COLOR = 0xd8d8d8; 
+                        // Restored to near-white, relying on high exposure and HDR reflection for definition
+                        const CERAMIC_COLOR = 0xf8f8f8; 
 
                         if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: Diffuses the light beautifully
+                            // TRANSLUCENT SHADE: Illumination comes from the HDR + the bright lens inside
                             material.transmission = 0.9; 
                             material.thickness = 1.0; 
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
                             material.roughness = 0.9; 
                             material.metalness = 0.0;
-                            // Give the shade a soft, warm base color
+                            // Set base color to the desired shade color
                             material.color.set(0xfff8f0); 
                             
-                            // SHADE GLOW: Must rely on its own emissive property now
-                            // *** ADJUSTED EMISSION INTENSITY FOR VISIBILITY ***
-                            material.emissive.set(0xffffff); 
-                            material.emissiveIntensity = 10.0; // Increased significantly
+                            // SHADE GLOW: Set to 0.0, relying on internal illumination from the LENS.
+                            material.emissive.set(0x000000); 
+                            material.emissiveIntensity = 0.0; 
                             child.layers.enable(BLOOM_SCENE); 
                             
                         } else if (modelName === 'lens') {
@@ -227,11 +222,11 @@
                             material.metalness = 0.0; material.roughness = 0.0;
                             material.color.set(0xffffff);
                             material.emissive.set(0xffd8b0); 
-                            material.emissiveIntensity = 40.0; // Very high intensity for bloom
+                            material.emissiveIntensity = 80.0; // Highly intense to illuminate the shade
                             child.layers.enable(BLOOM_SCENE); // Mark for bloom
 
                         } else if (isCeramicPart(modelName)) {
-                            // CERAMIC PARTS: Matte, off-white, and defined by the HDR map
+                            // CERAMIC PARTS: Matte, off-white, and defined by the HDR map and reflection
                             material.metalness = 0.0; 
                             material.roughness = 1.0; 
                             material.color.set(CERAMIC_COLOR); 
