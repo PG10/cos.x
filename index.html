@@ -29,9 +29,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // *** REALISM FIX: Lower exposure for better contrast and HDRI shadow definition ***
+            // REALISM FIX: Lower exposure for better contrast and HDRI shadow definition
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 0.5; // Changed from 1.0 to 0.5
+            renderer.toneMappingExposure = 0.5; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             renderer.setClearColor(0xcccccc);
             document.body.appendChild(renderer.domElement);
@@ -40,14 +40,15 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            const distance = 0.15;
+            // FIX: Increase initial distance significantly to start outside the model
+            const distance = 2.0; // Changed from 0.15 to 2.0
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // *** ORBITCONTROLS SETUP (Rotation and Zoom) ***
+            // ORBITCONTROLS SETUP (Rotation, Pan, and Zoom)
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             
-            // Allows full zoom control
+            // FIX: Allows full zoom control (in and out)
             controls.minDistance = 0.05; 
             controls.maxDistance = 5.0; 
 
@@ -85,12 +86,12 @@
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 
-                // *** REALISM FIX: Apply Material Properties to all meshes ***
+                // REALISM FIX: Apply Material Properties to all meshes
                 model.traverse((child) => {
                     if (child.isMesh) {
                         const material = child.material;
                         
-                        // Add subtle metallic and smoothness for a more realistic sink look
+                        // Add subtle metallic and smoothness for a more realistic look
                         material.metalness = 0.2; 
                         material.roughness = 0.4;  
                         material.needsUpdate = true;
