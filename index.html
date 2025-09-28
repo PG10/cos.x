@@ -41,11 +41,14 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.2; 
+            // *** TONE MAPPING CHANGE: Switching to Cineon (a softer alternative to ACES) ***
+            renderer.toneMapping = THREE.CineonToneMapping; 
+            
+            // Exposure reduced as Cineon handles highlights better
+            renderer.toneMappingExposure = 0.8; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            renderer.setClearColor(0xffffff); 
+            renderer.setClearColor(0x000000); 
             document.body.appendChild(renderer.domElement);
 
             // Setup Scene and Camera
@@ -102,6 +105,8 @@
                 'gripper': GRIPPER_MODEL_PATH,
                 'holder': HOLDER_MODEL_PATH,
                 'lens': LENS_MODEL_PATH,
+                'shade': SHADE_MODEL_PATH,
+                'sink': SINK_MODEL_PATH,    
                 'suspension': SUSPENSION_MODEL_PATH
             };
 
@@ -113,20 +118,19 @@
                         
                         let material = child.material;
 
-                        // Reset properties for safety
+                        // Reset properties and ensure it's a Standard Material
                         material.transparent = false;
                         material.opacity = 1.0;
                         material.emissive.set(0x000000);
                         material.emissiveIntensity = 0.0;
-                        material.needsUpdate = true;
                         
-                        // *** IMPORTANT: Make sure the material is MeshStandardMaterial before setting PBR properties ***
                         if (!material.isMeshStandardMaterial) {
+                            // Ensure all materials are PBR MeshStandardMaterial
                             material = new THREE.MeshStandardMaterial().copy(material);
                             child.material = material;
                         }
 
-                        // --- MATERIAL CUSTOMIZATION (FINAL TRANSLUCENCY SIMULATION) ---
+                        // --- MATERIAL CUSTOMIZATION (Targeting Pure White & Glow) ---
                         let metalness = 0.0;
                         let roughness = 0.5;
                         let color = 0xffffff;
@@ -135,7 +139,7 @@
                             // ALUMINA HEATSINK: Pure White, low sheen
                             metalness = 0.01; roughness = 0.4; color = 0xffffff; 
                         } else if (modelName === 'shade') {
-                            // FIX: Simulating the glow using the shade's emissive channel
+                            // TRANSLUCENT SHADE: Simulated glow
                             metalness = 0.01; 
                             roughness = 0.95; 
                             color = 0xffffff; 
@@ -143,15 +147,15 @@
                             material.opacity = 0.6; 
                             material.side = THREE.DoubleSide; 
                             
-                            // *** SHADE GLOW SIMULATION: Apply a subtle warm emissive color ***
+                            // SHADE GLOW SIMULATION
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.1; // Low intensity to just give a diffused glow
+                            material.emissiveIntensity = 0.5; 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (Only required as a glowing point)
+                            // WARM EMISSIVE LENS (The light source)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 10.0; // High intensity for the light source
+                            material.emissiveIntensity = 15.0; // High intensity light source
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -188,7 +192,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Translucency Simulated. Final Render Ready.");
+                    console.log("Cineon Tone Mapping Applied. Ready for final visual check.");
                 }
             };
             
