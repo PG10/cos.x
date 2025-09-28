@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Fixture Model - FINAL Photorealistic Glow</title>
+    <title>LED Fixture Model - Selective Photorealistic Glow</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -15,10 +15,15 @@
     <script src="./js/RGBELoader.js"></script>
     <script src="./js/DRACOLoader.js"></script>
     <script src="./js/OrbitControls.js"></script>
+    
     <script src="./js/EffectComposer.js"></script>
     <script src="./js/RenderPass.js"></script>
     <script src="./js/UnrealBloomPass.js"></script> 
-
+    
+    <script src="./js/CopyShader.js"></script>
+    <script src="./js/LuminosityHighPassShader.js"></script>
+    <script src="./js/ShaderPass.js"></script>
+    
     <script>
         // --- FILE PATHS (All 8 Components) ---
         const BANDS_MODEL_PATH      = '/cos.x/bands.glb';
@@ -30,227 +35,26 @@
         const SINK_MODEL_PATH       = '/cos.x/sink.glb';    
         const SUSPENSION_MODEL_PATH = '/cos.x/suspension.glb';
         
-        let scene, camera, renderer, controls, composer;
-        let models = {}; 
+        let scene, camera, renderer, controls;
+        let bloomComposer, finalComposer;
+        
+        // --- SELECTIVE BLOOM SETUP ---
+        const ENTIRE_SCENE = 0;
+        const BLOOM_SCENE = 1;
 
+        const bloomLayer = new THREE.Layers();
+        bloomLayer.set(BLOOM_SCENE);
+
+        const materials = {};
+        // Dark material used to hide non-glowing parts during the Bloom render pass
+        const darkMaterial = new THREE.MeshBasicMaterial( { color: 0x000000 } );
+        // ------------------------------
+        
         function init() {
             // --- EASY VIEW ADJUSTMENT VARIABLES ---
             const INITIAL_CAMERA_Z = 50.0; 
-            const MIN_ZOOM_DISTANCE = 1.0;  
-            const MAX_ZOOM_DISTANCE = 500.0; 
             // --------------------------------------
 
-            // Setup Renderer
+            // 1. Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            
-            // Cineon for softer, AGX-like highlight rolloff
-            renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 1.2; 
-            renderer.outputColorSpace = THREE.SRGBColorSpace; 
-            
-            // White background
-            renderer.setClearColor(0xffffff); 
-            document.body.appendChild(renderer.domElement);
-
-            // Setup Scene and Camera
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
-            camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
-            
-            // OrbitControls Setup
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
-            controls.target.set(0, 0, 0); 
-            controls.minDistance = MIN_ZOOM_DISTANCE; 
-            controls.maxDistance = MAX_ZOOM_DISTANCE; 
-            controls.enableDamping = true;
-            controls.update();
-
-            // *** EXTREME SPOT LIGHT SOURCE (REAL ILLUMINATION) ***
-            const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
-            spotLight.position.set(0, 5, 0); 
-            spotLight.target.position.set(0, 0, 0); 
-            scene.add(spotLight);
-            scene.add(spotLight.target);
-            // --------------------------------------------------
-
-            // --- POST-PROCESSING SETUP (BLOOM/GLOW) ---
-            composer = new THREE.EffectComposer(renderer);
-            composer.addPass(new THREE.RenderPass(scene, camera));
-
-            const bloomPass = new THREE.UnrealBloomPass(
-                new THREE.Vector2(window.innerWidth, window.innerHeight),
-                1.0,  // strength
-                0.2,  // radius
-                0.01  // threshold (only affects very bright emissive areas)
-            );
-            composer.addPass(bloomPass);
-            // ------------------------------------------
-
-            loadHDRAndModels();
-
-            window.addEventListener('resize', onWindowResize, false);
-            animate();
-        }
-
-        function loadHDRAndModels() {
-            // Load the HDR Environment Map - Assuming Neutral Studio HDR
-            new THREE.RGBELoader()
-                .setPath('./') 
-                .load('env.hdr', function (texture) {
-                    
-                    texture.mapping = THREE.EquirectangularReflectionMapping;
-                    scene.environment = texture; 
-
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully.");
-
-                    loadAllModels();
-                },
-                (xhr) => console.log(((xhr.loaded / xhr.total) * 100).toFixed(0) + '% loaded HDR'),
-                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Please check your local server's root path.", error)
-            );
-        }
-
-        function loadAllModels() {
-            const dracoLoader = new THREE.DRACOLoader();
-            dracoLoader.setDecoderPath('/cos.x/draco/'); 
-            const gltfLoader = new THREE.GLTFLoader();
-            gltfLoader.setDRACOLoader(dracoLoader);
-
-            let modelsLoaded = 0;
-            const totalModels = 8;
-            const modelPaths = {
-                'sink': SINK_MODEL_PATH,
-                'shade': SHADE_MODEL_PATH,
-                'bands': BANDS_MODEL_PATH,
-                'feeds': FEEDS_MODEL_PATH,
-                'gripper': GRIPPER_MODEL_PATH,
-                'holder': HOLDER_MODEL_PATH,
-                'lens': LENS_MODEL_PATH,
-                'suspension': SUSPENSION_MODEL_PATH
-            };
-
-            const onModelLoaded = (gltf, modelName) => {
-                const loadedModel = gltf.scene;
-                
-                loadedModel.traverse((child) => {
-                    if (child.isMesh) {
-                        
-                        let material = child.material;
-
-                        // Reset properties
-                        material.transparent = false;
-                        material.opacity = 1.0;
-                        material.emissive.set(0x000000);
-                        material.emissiveIntensity = 0.0;
-                        
-                        // Handle conversion if necessary
-                        if (modelName === 'shade' && !material.isMeshPhysicalMaterial) {
-                            // CONVERT SHADE TO PHYSICAL MATERIAL FOR SUB-SURFACE SCATTERING
-                            material = new THREE.MeshPhysicalMaterial().copy(material);
-                            child.material = material;
-                        } else if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) {
-                            material = new THREE.MeshStandardMaterial().copy(material);
-                            child.material = material;
-                        }
-
-                        // --- FINAL TUNED MATERIAL CUSTOMIZATION ---
-                        let metalness = 0.0;
-                        let roughness = 0.5;
-                        let color = 0xffffff;
-
-                        if (modelName === 'sink') {
-                            // ALUMINA HEATSINK: Pure White, low sheen
-                            metalness = 0.01; roughness = 0.4; color = 0xffffff; 
-                        } else if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL FOR SSS
-                            metalness = 0.01; 
-                            roughness = 0.9; 
-                            color = 0xffffff; 
-                            
-                            // *** SSS Properties ***
-                            material.transmission = 0.8; 
-                            material.thickness = 0.5; 
-                            material.transparent = true;
-                            material.side = THREE.DoubleSide; 
-
-                            // SHADE GLOW SIMULATION (Target for Bloom)
-                            material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 1.0; 
-                            
-                        } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (Extreme target for Bloom)
-                            metalness = 0.1; roughness = 0.1; color = 0xffffff; 
-                            material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 50.0; 
-                        } else if (modelName === 'gripper') {
-                            // SATIN ALUMINUM METAL
-                            metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
-                        } else if (modelName === 'holder' || modelName === 'bands') {
-                            // MATTE PLASTIC WHITE 
-                            metalness = 0.0; roughness = 0.8; color = 0xffffff; 
-                        } else if (modelName === 'suspension') {
-                            // DARKER GREY METAL WIRE CABLE
-                            metalness = 0.9; roughness = 0.2; color = 0x444444; 
-                        } else if (modelName === 'feeds') {
-                            // SLIGHTLY TRANSLUCENT DIFFUSE RUBBER (LIGHTER GRAY)
-                            metalness = 0.0; roughness = 0.8; color = 0x666666; 
-                            material.transparent = true; material.opacity = 0.9; 
-                        }
-
-                        // Apply PBR properties
-                        material.metalness = metalness;
-                        material.roughness = roughness;
-                        material.color.set(color); 
-                        
-                        child.material.needsUpdate = true;
-                        // --- END MATERIAL CUSTOMIZATION ---
-                    }
-                });
-
-                models[modelName] = loadedModel;
-                
-                // --- POSITIONING LOGIC ---
-                const defaultScale = 1.0; 
-                loadedModel.position.set(0, 0, 0); 
-                loadedModel.scale.set(defaultScale, defaultScale, defaultScale);
-                
-                scene.add(loadedModel);
-                modelsLoaded++;
-
-                if (modelsLoaded === totalModels) {
-                    console.log("Post-processing is ready. Final render attempt.");
-                }
-            };
-            
-            // Loop through all paths to load models
-            Object.keys(modelPaths).forEach(modelName => {
-                gltfLoader.load(modelPaths[modelName], 
-                    (gltf) => onModelLoaded(gltf, modelName), 
-                    undefined, 
-                    (error) => {
-                        console.error(`Error loading ${modelName}:`, error);
-                    }
-                );
-            });
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            // Must update composer size too!
-            composer.setSize(window.innerWidth, window.innerHeight); 
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            if (controls && controls.enableDamping) controls.update(); 
-            // Render using the composer for the bloom effect
-            composer.render();
-        }
-
-        init();
-    </script>
-</body>
-</html>
