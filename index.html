@@ -17,8 +17,9 @@
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
-        const MODEL_PATH = 'sink.glb';
-        const HDRI_PATH = 'studio1.hdr';
+        // *** ABSOLUTE PATH FIX for 404 errors ***
+        const MODEL_PATH = '/cos.x/sink.glb';    
+        const HDRI_PATH = '/cos.x/studio1.hdr';
 
         let scene, camera, renderer, model;
 
@@ -41,12 +42,11 @@
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // --- OrbitControls removed to prevent constructor error ---
-
             // Load Environment Map (HDRI)
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
             pmremGenerator.compileEquirectangularShader();
 
+            // *** HDRI_PATH now uses absolute path /cos.x/studio1.hdr ***
             new THREE.RGBELoader()
                 .setDataType(THREE.FloatType)
                 .load(HDRI_PATH, function (texture) {
@@ -55,6 +55,9 @@
                     texture.dispose();
                     pmremGenerator.dispose();
                     loadModel();
+                }, undefined, function (error) {
+                    // This will confirm if the HDRI file loaded correctly
+                    console.error('HDRI Load Error:', error); 
                 });
 
             window.addEventListener('resize', onWindowResize, false);
@@ -62,18 +65,20 @@
         }
 
         function loadModel() {
-            // DRACO Path: Correctly referencing the local draco folder
+            // *** DRACO Path Fix ***
             const dracoLoader = new THREE.DRACOLoader();
-            dracoLoader.setDecoderPath('./draco/'); 
+            // Absolute path is essential for the decoder files to be found.
+            dracoLoader.setDecoderPath('/cos.x/draco/'); 
 
             const loader = new THREE.GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
 
+            // *** MODEL_PATH now uses absolute path /cos.x/sink.glb ***
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 scene.add(model);
             }, undefined, function (error) {
-                console.error('An error happened loading the model:', error);
+                console.error('GLB Load Error:', error);
             });
         }
 
