@@ -109,11 +109,11 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                // FIX: Increased strength for more dramatic glow
-                1.5,  // strength (WAS 0.5)
+                // FIX: DECREASED strength for a tighter, less blurry glow (WAS 1.5, now 0.8)
+                0.8,  // strength
                 0.3,  // radius
-                // FIX: Decreased threshold to include brighter parts of the translucent shade
-                0.05   // threshold (WAS 0.1)
+                // FIX: INCREASED threshold significantly to ONLY bloom the brightest parts (WAS 0.05, now 0.9)
+                0.9   // threshold 
             );
 
             bloomComposer = new THREE.EffectComposer(renderer);
@@ -145,7 +145,7 @@
                             // FIX: Increased the multiplier for the bloom texture to make the glow more visible
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
-                            gl_FragColor = baseColor + (bloomColor * 1.5); // Multiplier increased to 1.5
+                            gl_FragColor = baseColor + (bloomColor * 1.5); // Multiplier remains 1.5
                         }
                     `,
                     defines: {}
@@ -222,16 +222,17 @@
                             
                             // SHADE GLOW (Target for Bloom)
                             material.emissive.set(0xffeebb);
-                            // FIX: Increased shade emissive intensity
-                            material.emissiveIntensity = 1.0; // WAS 1.0, now 5.0
+                            // FIX: Decreased shade emissive intensity significantly (WAS 5.0, now 1.0)
+                            material.emissiveIntensity = 1.0; 
+                            // The shade will still glow because the LENS will bleed light through it via the bloom effect.
                             child.layers.enable(BLOOM_SCENE); // Glows
                             
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS (Primary light source)
                             material.metalness = 0.1; material.roughness = 0.1; 
                             material.emissive.set(0xffeebb); 
-                            // FIX: Significantly increased lens emissive intensity
-                            material.emissiveIntensity = 1.0; // WAS 2.0, now 20.0
+                            // FIX: Lens emissive intensity remains high to trigger the high bloom threshold
+                            material.emissiveIntensity = 20.0; // Remains 20.0
                             child.layers.enable(BLOOM_SCENE); // Glows
 
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
