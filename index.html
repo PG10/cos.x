@@ -10,17 +10,17 @@
     </style>
 </head>
 <body>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/RGBELoader.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r137/examples/js/loaders/DRACOLoader.js"></script>
+    <script src="./js/three.min.js"></script>
+    <script src="./js/GLTFLoader.js"></script>
+    <script src="./js/RGBELoader.js"></script>
+    <script src="./js/DRACOLoader.js"></script>
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
         const MODEL_PATH = 'sink.glb';
         const HDRI_PATH = 'studio1.hdr';
 
-        let scene, camera, renderer, model; // Removed 'controls' variable
+        let scene, camera, renderer, model;
 
         function init() {
             // Setup Renderer
@@ -41,8 +41,7 @@
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
-            // *** Removed ALL OrbitControls initialization code here ***
-
+            // --- OrbitControls removed to prevent constructor error ---
 
             // Load Environment Map (HDRI)
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
@@ -63,7 +62,7 @@
         }
 
         function loadModel() {
-            // DRACO Path: Using the correct local relative path
+            // DRACO Path: Correctly referencing the local draco folder
             const dracoLoader = new THREE.DRACOLoader();
             dracoLoader.setDecoderPath('./draco/'); 
 
@@ -73,9 +72,6 @@
             loader.load(MODEL_PATH, function (gltf) {
                 model = gltf.scene;
                 scene.add(model);
-                // Optional: Rotate model slightly for a better view if needed
-                // model.rotation.y = Math.PI / 4; 
-
             }, undefined, function (error) {
                 console.error('An error happened loading the model:', error);
             });
@@ -89,7 +85,6 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            // *** Removed controls.update() call here ***
             renderer.render(scene, camera);
         }
 
