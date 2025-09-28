@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Fixture Model - Selective Photorealistic Glow</title>
+    <title>LED Fixture Model - Photorealistic White Studio</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -63,20 +63,30 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Reverting exposure back down to ensure objects have contrast.
+            // Set exposure for photorealistic brightness
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 0.3; // Reverted from 0.5
+            renderer.toneMappingExposure = 0.4; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            renderer.setClearColor(0xffffff); // White background
+            // Set background to light gray for subtle contrast
+            renderer.setClearColor(0xeeeeee); 
             document.body.appendChild(renderer.domElement);
 
             // 2. Setup Scene and Camera
             scene = new THREE.Scene();
-            // High ambient light to illuminate non-glowing parts on a white background
-            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0); 
+            
+            // 3. Lighting Setup (Studio Lighting Approach)
+            
+            // Main Fill Light (Bright Ambient) - provides overall softness
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); 
             scene.add(ambientLight);
 
+            // Key Light (Subtle directional light to define shape and cast soft shadows)
+            const keyLight = new THREE.DirectionalLight(0xffeebb, 0.8);
+            keyLight.position.set(20, 30, 40); // Top-front angle
+            scene.add(keyLight);
+            
+            // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
             camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
             
@@ -101,7 +111,7 @@
             
             const bloomPass = new THREE.UnrealBloomPass(
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
-                0.5,  // strength
+                1.2,  // strength (increased to match high lens brightness)
                 0.3,  // radius 
                 0.85   // threshold 
             );
@@ -131,7 +141,8 @@
                         void main() {
                             vec4 baseColor = texture2D( baseTexture, vUv );
                             vec4 bloomColor = texture2D( bloomTexture, vUv );
-                            gl_FragColor = baseColor + (bloomColor * 1.0); 
+                            // Combine base scene and bloom, reducing bloom factor slightly
+                            gl_FragColor = baseColor + (bloomColor * 0.8); 
                         }
                     `,
                     defines: {}
@@ -145,19 +156,22 @@
         }
 
         function loadHDRAndModels() {
+            // No HDR environment map needed for this studio setup (it complicates white-on-white)
+            loadAllModels();
+            /*
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
                     scene.environment = texture; 
                     renderer.autoClear = false; 
-                    // Low environment map contribution
                     scene.environmentIntensity = 0.1; 
                     loadAllModels();
                 },
                 undefined, 
-                (error) => console.error("FATAL ERROR: Could not load 'env.hdr'. Check server path.", error)
+                (error) => console.error("Could not load 'env.hdr'. Proceeding without environment map.", error)
             );
+            */
         }
 
         function loadAllModels() {
@@ -173,7 +187,7 @@
                 'lens': LENS_MODEL_PATH, 'suspension': SUSPENSION_MODEL_PATH
             };
 
-            const isWhitePart = (name) => 
+            const isCeramicPart = (name) => 
                 name === 'sink' || name === 'holder' || name === 'bands' || name === 'feeds';
             
             const onModelLoaded = (gltf, modelName) => {
@@ -184,48 +198,49 @@
                         
                         let material = child.material;
                         
-                        // Force MeshPhysicalMaterial for more control and robustness
+                        // Force MeshPhysicalMaterial for maximum control over PBR properties
                         if (!material.isMeshPhysicalMaterial) {
                             material = new THREE.MeshPhysicalMaterial().copy(material);
                             child.material = material;
                         }
 
                         // --- APPLY FINAL PBR AND GLOW PROPERTIES ---
-                        material.emissive.set(0x000000); // Base emissive reset
+                        material.emissive.set(0x000000); 
                         child.layers.set(ENTIRE_SCENE); 
                         
-                        // Define the color for white parts (slightly off-white for contrast)
-                        const WHITE_PART_COLOR = 0xf0f0f0;
+                        // Define the base color for white parts (slight off-white)
+                        const CERAMIC_COLOR = 0xf5f5f5; 
 
                         if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL 
-                            material.transmission = 0.8; 
-                            material.thickness = 0.8; 
+                            // TRANSLUCENT SHADE: Matte Translucency with a hint of warm color
+                            material.transmission = 0.85; 
+                            material.thickness = 1.0; 
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
-                            material.roughness = 0.9; 
+                            material.roughness = 0.95; 
                             material.metalness = 0.0;
-                            // Shade color set to off-white for definition against background
-                            material.color.set(WHITE_PART_COLOR); 
+                            // Give the shade a soft, warm tint
+                            material.color.set(0xfff8f0); 
                             
-                            // SHADE GLOW (Target for Bloom)
+                            // SHADE GLOW (Passive emission to enhance diffusion)
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.5; 
+                            material.emissiveIntensity = 0.1; 
                             child.layers.enable(BLOOM_SCENE); 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (Primary light source)
-                            material.metalness = 0.1; material.roughness = 0.1; 
+                            // WARM EMISSIVE LENS (The primary light source)
+                            material.metalness = 0.0; material.roughness = 0.0; // Minimal roughness
+                            material.color.set(0xffffff);
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 20.0; 
+                            // HIGH Emissive intensity for maximum bloom and light spill
+                            material.emissiveIntensity = 40.0; 
                             child.layers.enable(BLOOM_SCENE); 
 
-                        } else if (isWhitePart(modelName)) {
-                            // CERAMIC/PLASTIC PARTS (Matte Off-White)
+                        } else if (isCeramicPart(modelName)) {
+                            // CERAMIC PARTS (Matte Off-White)
                             material.metalness = 0.0; 
                             material.roughness = 1.0; // Max roughness (pure matte)
-                            // Sink/Holder color set to off-white for definition against background
-                            material.color.set(WHITE_PART_COLOR); 
+                            material.color.set(CERAMIC_COLOR); // Off-white for contrast
                             
                         } else if (modelName === 'gripper' || modelName === 'suspension') {
                             // METAL PARTS (Dark Gray Chrome)
