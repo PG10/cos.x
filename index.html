@@ -42,7 +42,6 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            // *** EXPOSURE BOOST: Increased to 1.2 for a bright, studio-like finish ***
             renderer.toneMappingExposure = 1.2; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
@@ -120,34 +119,35 @@
                         material.emissiveIntensity = 0.0;
                         material.needsUpdate = true;
                         
-                        // --- MATERIAL CUSTOMIZATION (FINAL REFINEMENT) ---
+                        // --- MATERIAL CUSTOMIZATION (FINAL TRANSLUCENCY TWEAKS) ---
                         let metalness = 0.0;
                         let roughness = 0.5;
-                        let color = 0xffffff; // Default to PURE WHITE
+                        let color = 0xffffff;
 
                         if (modelName === 'sink') {
-                            // ALUMINA HEATSINK: Pure White, low sheen porcelain
-                            metalness = 0.01; 
-                            roughness = 0.4; 
-                            color = 0xffffff; // PURE WHITE
+                            // ALUMINA HEATSINK: Pure White, low sheen
+                            metalness = 0.01; roughness = 0.4; color = 0xffffff; 
                         } else if (modelName === 'shade') {
-                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE: Max diffusion for glow
+                            // REFINED: DIFFUSE TRANSLUCENT PORCELAIN SHADE
                             metalness = 0.01; 
-                            roughness = 0.95; // Very high roughness
-                            color = 0xffffff; // PURE WHITE
+                            roughness = 0.95; 
+                            color = 0xffffff; 
                             material.transparent = true; 
-                            material.opacity = 0.7; 
+                            // *** LOWER OPACITY: Reduced to allow more light through ***
+                            material.opacity = 0.6; 
+                            material.side = THREE.DoubleSide; // Render both sides of the shade for better lighting
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 7.0; // *** BOOSTED POWER for strong internal glow ***
+                            // *** BOOSTED INTENSITY: Max power for the internal light source ***
+                            material.emissiveIntensity = 10.0; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
                         } else if (modelName === 'holder' || modelName === 'bands') {
                             // MATTE PLASTIC WHITE 
-                            metalness = 0.0; roughness = 0.8; color = 0xffffff; // PURE WHITE
+                            metalness = 0.0; roughness = 0.8; color = 0xffffff; 
                         } else if (modelName === 'suspension') {
                             // DARKER GREY METAL WIRE CABLE
                             metalness = 0.9; roughness = 0.2; color = 0x444444; 
