@@ -41,9 +41,9 @@
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             
-            // Cineon is the best AGX-like, non-clipping tone mapping option
+            // Cineon for softer, AGX-like highlight rolloff
             renderer.toneMapping = THREE.CineonToneMapping; 
-            renderer.toneMappingExposure = 1.2; // Moderate exposure for a bright studio HDR
+            renderer.toneMappingExposure = 1.2; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             // White background to match reference image
@@ -64,6 +64,15 @@
             controls.enableDamping = true;
             controls.update();
 
+            // *** FIX: ADD HIGH-INTENSITY SPOT LIGHT TO SIMULATE INTERNAL LIGHT SOURCE ***
+            const spotLight = new THREE.SpotLight(0xfff0dd, 200, 100, Math.PI / 4, 0.5);
+            // Positioned slightly above the lens, aimed straight down (0, 0, 0)
+            spotLight.position.set(0, 5, 0); 
+            spotLight.target.position.set(0, 0, 0); 
+            scene.add(spotLight);
+            scene.add(spotLight.target);
+            // ---------------------------------------------------------------------------
+
             loadHDRAndModels();
 
             window.addEventListener('resize', onWindowResize, false);
@@ -71,7 +80,7 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - Should be the "Studio Small 01" or equivalent.
+            // Load the HDR Environment Map - Assuming Neutral Studio HDR
             new THREE.RGBELoader()
                 .setPath('./') 
                 .load('env.hdr', function (texture) {
@@ -143,15 +152,15 @@
                             material.opacity = 0.6; 
                             material.side = THREE.DoubleSide; 
                             
-                            // SHADE GLOW SIMULATION
+                            // SHADE GLOW SIMULATION (Emissive handles the scattering light appearance)
                             material.emissive.set(0xffeebb);
-                            material.emissiveIntensity = 0.5; // High simulated glow
+                            material.emissiveIntensity = 0.5; 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The visual light source)
+                            // WARM EMISSIVE LENS (The visual light source - power reduced as Spot Light handles illumination)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 15.0; // High intensity light source
+                            material.emissiveIntensity = 5.0; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -188,7 +197,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("Cineon Tone Mapping and final materials tuned for studio look. Ready for final check.");
+                    console.log("Spot Light and Cineon Tone Mapping applied for final photorealistic attempt.");
                 }
             };
             
