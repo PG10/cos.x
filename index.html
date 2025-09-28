@@ -40,9 +40,7 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // *** FIX: Increase initial distance significantly (10.0) to start outside the model ***
-            const distance = 10.0; 
-            camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
+            camera.position.set(50.0, 25.0, 75.0); 
             
             // ORBITCONTROLS SETUP (Rotation, Pan, and Zoom)
             controls = new THREE.OrbitControls(camera, renderer.domElement);
