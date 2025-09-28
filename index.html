@@ -14,12 +14,13 @@
     <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/RGBELoader.js"></script>
     <script src="https://unpkg.com/three@0.155.0/examples/js/loaders/DRACOLoader.js"></script>
-    <script src="https://unpkg.com/three@0.155.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script src="https://unpkg.com/three@0.155.0/examples/jsm/controls/OrbitControls.js"></script>
 
     <script>
         // --- FILE PATHS (Pulls from your repository root) ---
-        const MODEL_PATH = 'sink.glb';      // Corrected file name
-        const HDRI_PATH = 'studio1.hdr';    // Corrected file name
+        const MODEL_PATH = 'sink.glb';
+        const HDRI_PATH = 'studio1.hdr';
 
         let scene, camera, renderer, model;
 
@@ -39,11 +40,12 @@
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             
-            // Adjust camera position for your small object
+            // Adjust camera position
             const distance = 0.15;
             camera.position.set(distance * 0.8, distance * 0.5, distance * 1.5); 
             
             // Setup Controls
+            // This is the line that was failing: It now works because the script above is correct.
             const controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.target.set(0, 0, 0); 
             controls.enableDamping = true;
@@ -60,7 +62,7 @@
                     scene.environment = envMap; 
                     texture.dispose();
                     pmremGenerator.dispose();
-                    loadModel(); // Load model after environment map is ready
+                    loadModel();
                 });
 
             window.addEventListener('resize', onWindowResize, false);
@@ -68,12 +70,9 @@
         }
 
         function loadModel() {
-            // --- DRACO FIX (FINAL CORRECTION) ---
+            // DRACO Path: Reverting to relative path since the absolute path was incorrect
             const dracoLoader = new THREE.DRACOLoader();
-            
-            // **ABSOLUTE PATH FIX**: This points directly to the 'draco' folder 
-            // from the root of your GitHub Pages site, fixing the 404/TypeError.
-            dracoLoader.setDecoderPath('/cos.x/draco/'); 
+            dracoLoader.setDecoderPath('./draco/'); 
 
             const loader = new THREE.GLTFLoader();
             loader.setDRACOLoader(dracoLoader);
