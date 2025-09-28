@@ -45,12 +45,12 @@
         <label>Exposure: <input type="range" id="exposure" min="0" max="3" step="0.1" value="1.0"></label>
     </div>
 
-    <!-- Fixed Three.js CDN URLs for r128 -->
+    <!-- Reliable Three.js CDN URLs for r128 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/DRACOLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/RGBELoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/loaders/DRACOLoader.js"></script>
     
     <script>
         // --- SCENE CONFIGURATION PARAMETERS ---
@@ -107,6 +107,13 @@
         bloomLayer.set(1);
         
         function init() {
+            // Check if Three.js loaded properly
+            if (typeof THREE === 'undefined') {
+                console.error('Three.js failed to load');
+                document.getElementById('loading').innerHTML = 'Error: Three.js failed to load';
+                return;
+            }
+
             // Setup Renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -441,8 +448,17 @@
             }
         }
 
-        // Initialize when page loads
-        window.addEventListener('load', init);
+        // Initialize when page loads (with delay to ensure scripts load)
+        function initWhenReady() {
+            if (typeof THREE !== 'undefined' && THREE.GLTFLoader && THREE.RGBELoader && THREE.OrbitControls) {
+                init();
+            } else {
+                console.log('Waiting for Three.js to load...');
+                setTimeout(initWhenReady, 100);
+            }
+        }
+        
+        window.addEventListener('load', initWhenReady);
     </script>
 </body>
 </html>
