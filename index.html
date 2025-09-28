@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>LED Fixture Model - Photorealistic Glow</title>
+    <title>LED Fixture Model - FINAL Photorealistic Glow</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -49,14 +49,13 @@
             renderer.toneMappingExposure = 1.2; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
-            // White background to match reference image
+            // White background
             renderer.setClearColor(0xffffff); 
             document.body.appendChild(renderer.domElement);
 
             // Setup Scene and Camera
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000); 
-            
             camera.position.set(0.0, 10.0, INITIAL_CAMERA_Z); 
             
             // OrbitControls Setup
@@ -67,7 +66,7 @@
             controls.enableDamping = true;
             controls.update();
 
-            // *** REAL LIGHT SOURCE (FOR SHADE ILLUMINATION) ***
+            // *** EXTREME SPOT LIGHT SOURCE (REAL ILLUMINATION) ***
             const spotLight = new THREE.SpotLight(0xfff0dd, 5000, 100, Math.PI / 4, 0.5);
             spotLight.position.set(0, 5, 0); 
             spotLight.target.position.set(0, 0, 0); 
@@ -83,7 +82,7 @@
                 new THREE.Vector2(window.innerWidth, window.innerHeight),
                 1.0,  // strength
                 0.2,  // radius
-                0.01  // threshold (only affects very bright areas)
+                0.01  // threshold (only affects very bright emissive areas)
             );
             composer.addPass(bloomPass);
             // ------------------------------------------
@@ -139,7 +138,7 @@
                         
                         let material = child.material;
 
-                        // Reset properties and ensure it's a Standard Material (or Physical)
+                        // Reset properties
                         material.transparent = false;
                         material.opacity = 1.0;
                         material.emissive.set(0x000000);
@@ -147,6 +146,7 @@
                         
                         // Handle conversion if necessary
                         if (modelName === 'shade' && !material.isMeshPhysicalMaterial) {
+                            // CONVERT SHADE TO PHYSICAL MATERIAL FOR SUB-SURFACE SCATTERING
                             material = new THREE.MeshPhysicalMaterial().copy(material);
                             child.material = material;
                         } else if (!material.isMeshStandardMaterial && !material.isMeshPhysicalMaterial) {
@@ -163,7 +163,7 @@
                             // ALUMINA HEATSINK: Pure White, low sheen
                             metalness = 0.01; roughness = 0.4; color = 0xffffff; 
                         } else if (modelName === 'shade') {
-                            // TRANSLUCENT SHADE: NOW USING MESHPHYSICALMATERIAL FOR SSS
+                            // TRANSLUCENT SHADE: MESHPHYSICALMATERIAL FOR SSS
                             metalness = 0.01; 
                             roughness = 0.9; 
                             color = 0xffffff; 
@@ -174,15 +174,15 @@
                             material.transparent = true;
                             material.side = THREE.DoubleSide; 
 
-                            // SHADE GLOW SIMULATION (Boosted)
+                            // SHADE GLOW SIMULATION (Target for Bloom)
                             material.emissive.set(0xffeebb);
                             material.emissiveIntensity = 1.0; 
                             
                         } else if (modelName === 'lens') {
-                            // WARM EMISSIVE LENS (The visual light source - EXTREME BOOST)
+                            // WARM EMISSIVE LENS (Extreme target for Bloom)
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 50.0; // Extreme intensity for visual clipping/bloom
+                            material.emissiveIntensity = 50.0; 
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
@@ -219,7 +219,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("MeshPhysicalMaterial and Unreal Bloom applied. Final photorealistic setup complete.");
+                    console.log("Post-processing is ready. Final render attempt.");
                 }
             };
             
@@ -239,7 +239,8 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
+            // Must update composer size too!
+            composer.setSize(window.innerWidth, window.innerHeight); 
         }
 
         function animate() {
