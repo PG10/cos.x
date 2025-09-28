@@ -18,7 +18,6 @@
 
     <script>
         // --- FILE PATHS (All 8 Components) ---
-        // These paths are correct for files inside the /cos.x/ folder
         const BANDS_MODEL_PATH      = '/cos.x/bands.glb';
         const FEEDS_MODEL_PATH      = '/cos.x/feeds.glb';
         const GRIPPER_MODEL_PATH    = '/cos.x/gripper.glb';
@@ -43,7 +42,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 0.7; 
+            // *** EXPOSURE BOOST: Increased to 1.2 for a bright, studio-like finish ***
+            renderer.toneMappingExposure = 1.2; 
             renderer.outputColorSpace = THREE.SRGBColorSpace; 
             
             renderer.setClearColor(0xffffff); 
@@ -70,16 +70,16 @@
         }
 
         function loadHDRAndModels() {
-            // Load the HDR Environment Map - PATH CORRECTED TO RELATIVE PATH (./)
+            // Load the HDR Environment Map - Using the correct relative path './'
             new THREE.RGBELoader()
-                .setPath('./') // <-- CORRECTED PATH: Should resolve the 404 error by looking in the current folder.
+                .setPath('./') 
                 .load('env.hdr', function (texture) {
                     
                     texture.mapping = THREE.EquirectangularReflectionMapping;
 
                     scene.environment = texture;
 
-                    console.log("HDR Environment Map 'env.hdr' loaded successfully from current folder.");
+                    console.log("HDR Environment Map 'env.hdr' loaded successfully.");
 
                     loadAllModels();
                 },
@@ -120,29 +120,34 @@
                         material.emissiveIntensity = 0.0;
                         material.needsUpdate = true;
                         
-                        // --- MATERIAL CUSTOMIZATION ---
+                        // --- MATERIAL CUSTOMIZATION (FINAL REFINEMENT) ---
                         let metalness = 0.0;
                         let roughness = 0.5;
-                        let color = 0xffffff;
+                        let color = 0xffffff; // Default to PURE WHITE
 
                         if (modelName === 'sink') {
-                            // ALUMINA HEATSINK: Pure White, slight sheen porcelain effect
-                            metalness = 0.05; roughness = 0.3; color = 0xffffff; 
+                            // ALUMINA HEATSINK: Pure White, low sheen porcelain
+                            metalness = 0.01; 
+                            roughness = 0.4; 
+                            color = 0xffffff; // PURE WHITE
                         } else if (modelName === 'shade') {
-                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE:
-                            metalness = 0.05; roughness = 0.9; color = 0xffffff; 
-                            material.transparent = true; material.opacity = 0.7; 
+                            // DIFFUSE TRANSLUCENT PORCELAIN SHADE: Max diffusion for glow
+                            metalness = 0.01; 
+                            roughness = 0.95; // Very high roughness
+                            color = 0xffffff; // PURE WHITE
+                            material.transparent = true; 
+                            material.opacity = 0.7; 
                         } else if (modelName === 'lens') {
                             // WARM EMISSIVE LENS
                             metalness = 0.1; roughness = 0.1; color = 0xffffff; 
                             material.emissive.set(0xffeebb); 
-                            material.emissiveIntensity = 3.5; 
+                            material.emissiveIntensity = 7.0; // *** BOOSTED POWER for strong internal glow ***
                         } else if (modelName === 'gripper') {
                             // SATIN ALUMINUM METAL
                             metalness = 0.9; roughness = 0.5; color = 0xc0c0c0;
                         } else if (modelName === 'holder' || modelName === 'bands') {
                             // MATTE PLASTIC WHITE 
-                            metalness = 0.0; roughness = 0.8; color = 0xffffff; 
+                            metalness = 0.0; roughness = 0.8; color = 0xffffff; // PURE WHITE
                         } else if (modelName === 'suspension') {
                             // DARKER GREY METAL WIRE CABLE
                             metalness = 0.9; roughness = 0.2; color = 0x444444; 
@@ -170,7 +175,7 @@
                 modelsLoaded++;
 
                 if (modelsLoaded === totalModels) {
-                    console.log("All 8 models loaded. Scene fully initialized with HDR lighting.");
+                    console.log("Assembly and Materials complete. Ready for final review.");
                 }
             };
             
